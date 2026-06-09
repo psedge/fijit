@@ -7,17 +7,22 @@ pub struct ObscuraRunner {
 
 impl ObscuraRunner {
     pub fn new(binary: impl Into<String>) -> Self {
-        Self { binary: binary.into() }
+        Self {
+            binary: binary.into(),
+        }
     }
 
     /// Fetch a page with stealth mode, evaluate JS, return the output.
     pub fn eval(&self, url: &str, script: &str, wait_secs: u64) -> Result<String> {
         let output = Command::new(&self.binary)
             .args([
-                "fetch", url,
+                "fetch",
+                url,
                 "--stealth",
-                "--wait", &wait_secs.to_string(),
-                "--eval", script,
+                "--wait",
+                &wait_secs.to_string(),
+                "--eval",
+                script,
                 "--quiet",
             ])
             .output()
@@ -27,7 +32,10 @@ impl ObscuraRunner {
             bail!(
                 "obscura exited {}: {}",
                 output.status,
-                String::from_utf8_lossy(&output.stderr).chars().take(300).collect::<String>()
+                String::from_utf8_lossy(&output.stderr)
+                    .chars()
+                    .take(300)
+                    .collect::<String>()
             );
         }
 
@@ -43,6 +51,9 @@ impl ObscuraRunner {
                 return Ok(t.to_owned());
             }
         }
-        bail!("no JSON found in obscura output:\n{}", &raw[..raw.len().min(400)])
+        bail!(
+            "no JSON found in obscura output:\n{}",
+            &raw[..raw.len().min(400)]
+        )
     }
 }

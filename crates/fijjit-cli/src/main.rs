@@ -43,9 +43,7 @@ enum Cmd {
 }
 
 fn load_scrapers(config: &Config) -> Vec<Box<dyn Scraper>> {
-    vec![
-        Box::new(BikeDiscountScraper::new(config.obscura())),
-    ]
+    vec![Box::new(BikeDiscountScraper::new(config.obscura()))]
 }
 
 fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a dyn Scraper> {
@@ -75,7 +73,7 @@ fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
 }
 
 fn cmd_list(scrapers: &[Box<dyn Scraper>], config: &Config) {
-    println!("{:<20} {:<12} {}", "NAME", "SCHEDULE", "DESCRIPTION");
+    println!("{:<20} {:<12} DESCRIPTION", "NAME", "SCHEDULE");
     println!("{}", "-".repeat(70));
     for s in scrapers {
         let schedule = config

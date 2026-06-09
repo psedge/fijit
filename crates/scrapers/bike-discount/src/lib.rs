@@ -26,7 +26,9 @@ pub struct BikeDiscountScraper {
 
 impl BikeDiscountScraper {
     pub fn new(obscura_path: &str) -> Self {
-        Self { runner: ObscuraRunner::new(obscura_path) }
+        Self {
+            runner: ObscuraRunner::new(obscura_path),
+        }
     }
 }
 
