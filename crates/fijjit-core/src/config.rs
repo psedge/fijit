@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,21 +14,23 @@ pub struct Config {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ScraperConfig {
-    /// Cron expression, e.g. "*/30 * * * *"
+    /// Cron expression, e.g. `"*/30 * * * *"`
     pub schedule: Option<String>,
-    /// Extra scraper-specific keys, e.g. target URL overrides
+    /// Scraper-specific overrides (e.g. target URL)
     #[serde(flatten)]
     pub extra: HashMap<String, toml::Value>,
 }
 
 impl Config {
+    /// Load config from `./fijjit.toml` or `~/.config/fijjit/config.toml`.
     pub fn load() -> Result<Self> {
         let path = Self::find_path()?;
         let raw = std::fs::read_to_string(&path)
-            .with_context(|| format!("reading config at {}", path.display()))?;
-        toml::from_str(&raw).with_context(|| format!("parsing config at {}", path.display()))
+            .map_err(|e| Error::Config(format!("reading {}: {e}", path.display())))?;
+        toml::from_str(&raw).map_err(|e| Error::Config(format!("parsing {}: {e}", path.display())))
     }
 
+    /// Like `load`, but returns an empty default if no config file is found.
     pub fn load_or_default() -> Self {
         Self::load().unwrap_or_else(|_| Config {
             obscura_path: None,
@@ -37,25 +39,27 @@ impl Config {
         })
     }
 
-    /// ./fijjit.toml → ~/.config/fijjit/config.toml
+    /// Resolve config path: `./fijjit.toml` → `~/.config/fijjit/config.toml`.
     pub fn find_path() -> Result<PathBuf> {
         let local = PathBuf::from("fijjit.toml");
         if local.exists() {
             return Ok(local);
         }
-        let global = dirs_path().join("config.toml");
+        let global = global_config_dir().join("config.toml");
         if global.exists() {
             return Ok(global);
         }
-        anyhow::bail!(
+        Err(Error::Config(format!(
             "no config found — create ./fijjit.toml or {}",
             global.display()
-        )
+        )))
     }
 
     pub fn save_to_local(&self) -> Result<()> {
-        let s = toml::to_string_pretty(self).context("serialising config")?;
-        std::fs::write("fijjit.toml", s).context("writing fijjit.toml")
+        let s = toml::to_string_pretty(self)
+            .map_err(|e| Error::Config(format!("serialising config: {e}")))?;
+        std::fs::write("fijjit.toml", s)
+            .map_err(|e| Error::Config(format!("writing fijjit.toml: {e}")))
     }
 
     pub fn obscura(&self) -> &str {
@@ -63,8 +67,65 @@ impl Config {
     }
 }
 
-fn dirs_path() -> PathBuf {
+fn global_config_dir() -> PathBuf {
     std::env::var("HOME")
         .map(|h| PathBuf::from(h).join(".config").join("fijjit"))
         .unwrap_or_else(|_| PathBuf::from(".config/fijjit"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn write_temp_config(contents: &str) -> tempfile::NamedTempFile {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        write!(f, "{contents}").unwrap();
+        f
+    }
+
+    #[test]
+    fn parses_valid_config() {
+        let f = write_temp_config(
+            r#"
+            obscura_path = "/usr/bin/obscura"
+            slack_webhook = "https://hooks.slack.com/test"
+
+            [scrapers.bike-discount]
+            schedule = "*/30 * * * *"
+            "#,
+        );
+        let raw = std::fs::read_to_string(f.path()).unwrap();
+        let config: Config = toml::from_str(&raw).unwrap();
+        assert_eq!(config.obscura(), "/usr/bin/obscura");
+        assert_eq!(
+            config.slack_webhook.as_deref(),
+            Some("https://hooks.slack.com/test")
+        );
+        assert_eq!(
+            config.scrapers["bike-discount"].schedule.as_deref(),
+            Some("*/30 * * * *")
+        );
+    }
+
+    #[test]
+    fn defaults_obscura_path() {
+        let config = Config {
+            obscura_path: None,
+            slack_webhook: None,
+            scrapers: HashMap::new(),
+        };
+        assert_eq!(config.obscura(), "/tmp/obscura");
+    }
+
+    #[test]
+    fn load_or_default_does_not_panic_without_file() {
+        // Change to a temp dir with no fijjit.toml
+        let dir = tempfile::tempdir().unwrap();
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        let config = Config::load_or_default();
+        std::env::set_current_dir(orig).unwrap();
+        assert!(config.scrapers.is_empty());
+    }
 }

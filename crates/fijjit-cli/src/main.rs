@@ -1,3 +1,5 @@
+#![deny(unsafe_code)]
+
 use anyhow::{bail, Result};
 use bike_discount::BikeDiscountScraper;
 use clap::{Parser, Subcommand};
