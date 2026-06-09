@@ -142,17 +142,25 @@ fn write_crontab(contents: &str) -> Result<()> {
 }
 
 fn cmd_init_config() {
-    println!(
-        r#"# fijjit.toml
+    use std::io::Write;
+    let _ = std::io::stdout().write_all(INIT_CONFIG_TEMPLATE.as_bytes());
+}
 
-obscura_path = "/usr/local/bin/obscura"
-slack_webhook = "https://hooks.slack.com/services/..."
+const INIT_CONFIG_TEMPLATE: &str = "\
+# fijjit.toml — global config (gitignored, keep your secrets here)
+#
+# Scrapers live in scrapers/*.toml (also gitignored).
+# Run: fijjit run <name>   to test a scraper
+#      fijjit schedule <name>   to add it to crontab
+
+obscura_path = \"/usr/local/bin/obscura\"
+slack_webhook = \"https://hooks.slack.com/services/...\"
+# or: slack_webhook = \"${SLACK_WEBHOOK}\"   to read from the environment
 
 # [vars]
-# MY_API_KEY = "secret"
-"#
-    );
-}
+# Global template variables available as {MY_VAR} in alert messages.
+# MY_KEY = \"my-value\"
+";
 
 fn main() -> Result<()> {
     let cli = Cli::parse();

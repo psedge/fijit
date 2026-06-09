@@ -1,81 +1,209 @@
 # fijjit
 
-A lightweight, extensible web scraper framework in Rust. Define scrapers as simple trait implementations, get Slack notifications and cron scheduling out of the box.
+[![CI](https://github.com/psedge/fijjit/actions/workflows/ci.yml/badge.svg)](https://github.com/psedge/fijjit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A declarative web scraper framework. Define a pipeline in TOML, get Slack alerts when something changes.
+
+```
+fijjit run bike-discount
+
+[bike-discount] checking…
+[bike-discount] no change
+```
+
+---
 
 ## How it works
 
-Fijjit uses [Obscura](https://github.com/h4ckf0r0day/obscura) — a stealth headless browser — to fetch pages that would otherwise block standard HTTP clients (e.g. Cloudflare-protected sites). Scrapers run on a schedule and notify you via Slack when something changes.
+Scrapers live in `scrapers/*.toml`. Each file describes a **pipeline** — a sequence of steps that fetch a page, extract elements, and fire alerts. There is no Rust to write.
+
+Fijjit uses [Obscura](https://github.com/h4ckf0r0day/obscura), a stealth headless browser, to bypass Cloudflare and similar bot protection. Standard HTTP clients get a 403; Obscura does not.
+
+```
+┌─────────────────────────────────────────────────┐
+│  scrapers/bike-discount.toml                    │
+│                                                 │
+│  query_all  →  find  →  alert_if                │
+│      │           │          │                   │
+│   fetch &      narrow     emit Slack            │
+│   extract      to 58cm    if in stock           │
+└─────────────────────────────────────────────────┘
+```
+
+---
 
 ## Installation
 
-Download the latest binary for your platform from [releases](https://github.com/psedge/fijjit/releases):
+Download the latest binary from [releases](https://github.com/psedge/fijjit/releases):
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-<version>-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-aarch64-apple-darwin.tar.gz | tar xz
+
 # macOS (Intel)
-curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-<version>-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-x86_64-apple-darwin.tar.gz | tar xz
+
 # Raspberry Pi (64-bit)
-curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-<version>-aarch64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-aarch64-unknown-linux-gnu.tar.gz | tar xz
 ```
 
 You'll also need [Obscura](https://github.com/h4ckf0r0day/obscura/releases):
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-aarch64-macos.tar.gz | tar xz -C /usr/local/bin
+curl -L https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-aarch64-macos.tar.gz \
+  | tar xz -C /usr/local/bin
 ```
 
-## Configuration
+---
 
-Fijjit looks for config at `./fijjit.toml` first, then `~/.config/fijjit/config.toml`.
+## Quick start
 
 ```bash
+# 1. generate a config file
 fijjit init-config > fijjit.toml
+
+# 2. edit fijjit.toml with your Obscura path and Slack webhook
+# 3. create a scraper in scrapers/my-thing.toml
+# 4. run it
+fijjit run my-thing
+
+# 5. schedule it
+fijjit schedule my-thing --cron "*/30 * * * *"
 ```
+
+---
+
+## Configuration — `fijjit.toml`
+
+Fijjit looks for `./fijjit.toml` first, then `~/.config/fijjit/config.toml`.
 
 ```toml
-# fijjit.toml
 obscura_path = "/usr/local/bin/obscura"
-slack_webhook = "https://hooks.slack.com/services/..."
+slack_webhook = "https://hooks.slack.com/services/..."   # global default
 
-[scrapers.bike-discount]
-schedule = "*/30 * * * *"
+[vars]
+# Custom variables available as {MY_VAR} in alert messages
+STORE_NAME = "bike-discount"
 ```
 
-## Usage
+Config values support `${ENV_VAR}` interpolation — useful for keeping secrets out of files:
+
+```toml
+slack_webhook = "${SLACK_WEBHOOK}"
+```
+
+---
+
+## Writing a scraper
+
+Scrapers live in `scrapers/*.toml` (the whole directory is gitignored — keep your secrets there).
+
+```toml
+name        = "bike-discount"
+description = "Watches Cube Editor Pro 58cm stock"
+url         = "https://www.bike-discount.de/en/cube-editor-pro-..."
+schedule    = "*/30 * * * *"
+slack_webhook = "${SLACK_WEBHOOK}"   # overrides global; omit to use global
+
+[[steps]]
+action   = "query_all"
+selector = ".nele-product-detail-configurator-option.nele-stock-info"
+
+[[steps]]
+action = "find"
+field  = "text"
+op     = "starts_with"
+value  = "58 cm"
+
+[[steps]]
+action  = "alert_if"
+field   = "class"
+op      = "contains"
+value   = "--stock-1"
+message = "🚲 *58cm Cube Editor Pro is IN STOCK!* <{url}|Buy now>"
+```
+
+The pipeline state is a list of `Element` objects. Each step reads from and writes back to that list. `alert_if` and friends don't modify the list — they emit Slack messages.
+
+---
+
+## Action reference
+
+| Action | What it does | Required fields |
+|---|---|---|
+| `query_all` | Fetch `url` with Obscura, query all elements matching `selector`. Replaces state. | `selector` |
+| `eval_json` | Fetch `url`, run a JS `script`, parse the JSON result. Replaces state. | `script` |
+| `find` | Keep the first element where `field` matches `value` (optionally via `op`). | `field`, `value` |
+| `filter` | Keep all elements where `field op value` is true. | `field`, `op`, `value` |
+| `set` | Store a literal `value` into a named `var`. | `var`, `value` |
+| `map` | Collect `field` from all elements into a named `var` (comma-joined). | `field`, `var` |
+| `alert_if` | Emit one alert if the first matching element satisfies `field op value`. | `field`, `op`, `value`, `message` |
+| `alert_if_empty` | Emit an alert when the element list is empty. | `message` |
+| `alert_if_any` | Emit one alert per element satisfying `field op value`. | `field`, `op`, `value`, `message` |
+| `log` | Print current element list to stdout. | — |
+
+Optional on `query_all` and `eval_json`: `wait` (seconds to pause after page load, default `3`).
+
+---
+
+## Op reference
+
+| Op | Description |
+|---|---|
+| `eq` | Exact equality |
+| `not_eq` | Not equal |
+| `contains` | Field contains value as a substring |
+| `not_contains` | Field does not contain value |
+| `starts_with` | Field starts with value |
+| `ends_with` | Field ends with value |
+| `matches` | Field matches value as a regular expression |
+
+---
+
+## Template variables in messages
+
+Alert messages support `{var}` placeholders:
+
+| Variable | Source |
+|---|---|
+| `{url}` | Scraper `url` field |
+| `{text}` | `text` of the matched element |
+| `{class}` | `class` of the matched element |
+| `{href}` | `href` of the matched element |
+| `{value}` | `value` of the matched element |
+| `{MY_VAR}` | Any key from `[vars]` in `fijjit.toml` |
+| `{MY_VAR}` | Any key stored by a `set` or `map` step |
+
+---
+
+## CLI reference
+
+```
+fijjit list                                    # show all scrapers
+fijjit run <name>                              # run once
+fijjit test-notify                             # send a test Slack message
+fijjit schedule <name>                         # add to crontab (default: */30 * * * *)
+fijjit schedule <name> --cron "0 9 * * *"     # daily at 9am
+fijjit unschedule <name>                       # remove from crontab
+fijjit init-config                             # print an example fijjit.toml
+```
+
+---
+
+## Building from source
 
 ```bash
-fijjit list                              # show all scrapers and their schedules
-fijjit run bike-discount                 # run a scraper once
-fijjit test-notify                       # send a test Slack message
-fijjit schedule bike-discount            # add to crontab (default: every 30 min)
-fijjit schedule bike-discount --cron "0 9 * * *"  # daily at 9am
-fijjit unschedule bike-discount          # remove from crontab
+git clone https://github.com/psedge/fijjit
+cd fijjit
+cargo build --release
+# binary at: target/release/fijjit
 ```
 
-## Adding a scraper
+Requires Rust stable (≥ 1.75). Cross-compilation targets (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`) are built automatically on release by GitHub Actions.
 
-1. Create a new crate under `crates/scrapers/your-scraper/`
-2. Implement the `Scraper` trait from `fijjit-core`:
-
-```rust
-use fijjit_core::scraper::{ScrapeResult, Scraper};
-
-pub struct MyScraper { /* ... */ }
-
-impl Scraper for MyScraper {
-    fn name(&self) -> &str { "my-scraper" }
-    fn description(&self) -> &str { "Watches something useful" }
-
-    fn check(&self) -> anyhow::Result<ScrapeResult> {
-        // fetch, parse, compare
-        Ok(ScrapeResult::Alert("Something changed!".into()))
-    }
-}
-```
-
-3. Register it in `crates/fijjit-cli/src/main.rs` → `load_scrapers()`
+---
 
 ## License
 

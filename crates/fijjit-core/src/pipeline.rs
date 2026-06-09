@@ -163,6 +163,8 @@ fn eval_op(field_val: &str, op: &Op, value: &str) -> bool {
         Op::Contains => field_val.contains(value),
         Op::NotContains => !field_val.contains(value),
         Op::Matches => regex::Regex::new(value).is_ok_and(|re| re.is_match(field_val)),
+        Op::StartsWith => field_val.starts_with(value),
+        Op::EndsWith => field_val.ends_with(value),
     }
 }
 
@@ -230,6 +232,7 @@ fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> Result<()> {
     match step.action {
         Action::QueryAll => {
@@ -238,7 +241,7 @@ fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> R
             let selector_js = serde_json::to_string(&selector).unwrap_or_default();
             let script = format!(
                 "JSON.stringify(Array.from(document.querySelectorAll({selector_js})).map(el => \
-                 ({{text: el.textContent.trim(), class: el.className, \
+                 ({{text: el.textContent.replace(/\\s+/g,' ').trim(), class: el.className, \
                    href: el.getAttribute('href'), value: el.getAttribute('value')}})))"
             );
             let json = ctx.obscura.eval_json(ctx.url, &script, step.wait.unwrap_or(3))?;
@@ -259,7 +262,12 @@ fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> R
             let found = ps
                 .elements
                 .iter()
-                .find(|el| el.get_field(field).is_some_and(|v| v == value))
+                .find(|el| {
+                    el.get_field(field).is_some_and(|v| match &step.op {
+                        Some(op) => eval_op(v, op, value),
+                        None => v == value,
+                    })
+                })
                 .cloned();
             ps.elements = found.into_iter().collect();
         }

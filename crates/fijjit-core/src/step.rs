@@ -76,4 +76,8 @@ pub enum Op {
     NotContains,
     /// Field matches the value as a regular expression.
     Matches,
+    /// Field starts with value.
+    StartsWith,
+    /// Field ends with value.
+    EndsWith,
 }
