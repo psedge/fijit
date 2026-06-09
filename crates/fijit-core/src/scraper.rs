@@ -13,7 +13,7 @@ pub trait Scraper: Send + Sync {
     /// Short unique identifier used in CLI commands, e.g. `"bike-discount"`.
     fn name(&self) -> &str;
 
-    /// Human-readable description shown in `fijjit list`.
+    /// Human-readable description shown in `fijit list`.
     fn description(&self) -> &str;
 
     /// Run one check and return what changed (if anything).
@@ -30,7 +30,7 @@ pub trait Scraper: Send + Sync {
         None
     }
 
-    /// Default cron schedule, shown in `fijjit list`.
+    /// Default cron schedule, shown in `fijit list`.
     fn schedule(&self) -> Option<&str> {
         None
     }

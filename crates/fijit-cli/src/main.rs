@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use fijjit_core::{
+use fijit_core::{
     config::Config,
     notify,
     pipeline::load_scraper_files,
@@ -10,7 +10,7 @@ use fijjit_core::{
 };
 
 #[derive(Parser)]
-#[command(name = "fijjit", about = "Lightweight web scraper framework")]
+#[command(name = "fijit", about = "Lightweight web scraper framework")]
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
@@ -40,7 +40,7 @@ enum Cmd {
         /// Scraper name
         name: String,
     },
-    /// Print an example fijjit.toml to stdout
+    /// Print an example fijit.toml to stdout
     InitConfig,
 }
 
@@ -56,7 +56,7 @@ fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a 
         .iter()
         .find(|s| s.name() == name)
         .map(|s| s.as_ref())
-        .ok_or_else(|| anyhow::anyhow!("unknown scraper '{}' — try `fijjit list`", name))
+        .ok_or_else(|| anyhow::anyhow!("unknown scraper '{}' — try `fijit list`", name))
 }
 
 fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
@@ -96,12 +96,12 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
     let binary = std::env::current_exe()?.to_string_lossy().into_owned();
     let cron_dir = std::env::current_dir()?.to_string_lossy().into_owned();
     let entry = format!("{cron}\tcd {cron_dir} && {binary} run {name}");
-    let tag = format!("# fijjit:{name}");
+    let tag = format!("# fijit:{name}");
 
     let existing = read_crontab()?;
     let filtered: Vec<&str> = existing
         .lines()
-        .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijjit run {name}")))
+        .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijit run {name}")))
         .collect();
 
     let new_crontab = format!("{}\n{tag}\n{entry}\n", filtered.join("\n").trim_end());
@@ -113,11 +113,11 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
 }
 
 fn cmd_unschedule(name: &str) -> Result<()> {
-    let tag = format!("# fijjit:{name}");
+    let tag = format!("# fijit:{name}");
     let existing = read_crontab()?;
     let filtered: Vec<&str> = existing
         .lines()
-        .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijjit run {name}")))
+        .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijit run {name}")))
         .collect();
     write_crontab(&format!("{}\n", filtered.join("\n").trim_end()))?;
     println!("Removed '{name}' from crontab");
@@ -147,11 +147,11 @@ fn cmd_init_config() {
 }
 
 const INIT_CONFIG_TEMPLATE: &str = "\
-# fijjit.toml — global config (gitignored, keep your secrets here)
+# fijit.toml — global config (gitignored, keep your secrets here)
 #
 # Scrapers live in scrapers/*.toml (also gitignored).
-# Run: fijjit run <name>   to test a scraper
-#      fijjit schedule <name>   to add it to crontab
+# Run: fijit run <name>   to test a scraper
+#      fijit schedule <name>   to add it to crontab
 
 obscura_path = \"/usr/local/bin/obscura\"
 slack_webhook = \"https://hooks.slack.com/services/...\"
@@ -174,7 +174,7 @@ fn main() -> Result<()> {
         }
         Cmd::List => cmd_list(&scrapers),
         Cmd::TestNotify => {
-            let msg = "🧪 *fijjit test* — notifications are working!";
+            let msg = "🧪 *fijit test* — notifications are working!";
             notify::slack_if_configured(config.slack_webhook.as_deref(), msg);
             println!("Test notification sent.");
         }

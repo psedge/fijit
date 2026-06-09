@@ -1,12 +1,12 @@
-# fijjit
+# fijit
 
-[![CI](https://github.com/psedge/fijjit/actions/workflows/ci.yml/badge.svg)](https://github.com/psedge/fijjit/actions/workflows/ci.yml)
+[![CI](https://github.com/psedge/fijit/actions/workflows/ci.yml/badge.svg)](https://github.com/psedge/fijit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A declarative web scraper framework. Define a pipeline in TOML, get Slack alerts when something changes.
 
 ```
-fijjit run bike-discount
+fijit run bike-discount
 
 [bike-discount] checking…
 [bike-discount] no change
@@ -18,7 +18,7 @@ fijjit run bike-discount
 
 Scrapers live in `scrapers/*.toml`. Each file describes a **pipeline** — a sequence of steps that fetch a page, extract elements, and fire alerts. There is no Rust to write.
 
-Fijjit uses [Obscura](https://github.com/h4ckf0r0day/obscura), a stealth headless browser, to bypass Cloudflare and similar bot protection. Standard HTTP clients get a 403; Obscura does not.
+Fijit uses [Obscura](https://github.com/h4ckf0r0day/obscura), a stealth headless browser, to bypass Cloudflare and similar bot protection. Standard HTTP clients get a 403; Obscura does not.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -35,17 +35,17 @@ Fijjit uses [Obscura](https://github.com/h4ckf0r0day/obscura), a stealth headles
 
 ## Installation
 
-Download the latest binary from [releases](https://github.com/psedge/fijjit/releases):
+Download the latest binary from [releases](https://github.com/psedge/fijit/releases):
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-aarch64-apple-darwin.tar.gz | tar xz
 
 # macOS (Intel)
-curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-x86_64-apple-darwin.tar.gz | tar xz
 
 # Raspberry Pi (64-bit)
-curl -L https://github.com/psedge/fijjit/releases/latest/download/fijjit-aarch64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-aarch64-unknown-linux-gnu.tar.gz | tar xz
 ```
 
 You'll also need [Obscura](https://github.com/h4ckf0r0day/obscura/releases):
@@ -62,22 +62,22 @@ curl -L https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-
 
 ```bash
 # 1. generate a config file
-fijjit init-config > fijjit.toml
+fijit init-config > fijit.toml
 
-# 2. edit fijjit.toml with your Obscura path and Slack webhook
+# 2. edit fijit.toml with your Obscura path and Slack webhook
 # 3. create a scraper in scrapers/my-thing.toml
 # 4. run it
-fijjit run my-thing
+fijit run my-thing
 
 # 5. schedule it
-fijjit schedule my-thing --cron "*/30 * * * *"
+fijit schedule my-thing --cron "*/30 * * * *"
 ```
 
 ---
 
-## Configuration — `fijjit.toml`
+## Configuration — `fijit.toml`
 
-Fijjit looks for `./fijjit.toml` first, then `~/.config/fijjit/config.toml`.
+Fijit looks for `./fijit.toml` first, then `~/.config/fijit/config.toml`.
 
 ```toml
 obscura_path = "/usr/local/bin/obscura"
@@ -173,7 +173,7 @@ Alert messages support `{var}` placeholders:
 | `{class}` | `class` of the matched element |
 | `{href}` | `href` of the matched element |
 | `{value}` | `value` of the matched element |
-| `{MY_VAR}` | Any key from `[vars]` in `fijjit.toml` |
+| `{MY_VAR}` | Any key from `[vars]` in `fijit.toml` |
 | `{MY_VAR}` | Any key stored by a `set` or `map` step |
 
 ---
@@ -181,13 +181,13 @@ Alert messages support `{var}` placeholders:
 ## CLI reference
 
 ```
-fijjit list                                    # show all scrapers
-fijjit run <name>                              # run once
-fijjit test-notify                             # send a test Slack message
-fijjit schedule <name>                         # add to crontab (default: */30 * * * *)
-fijjit schedule <name> --cron "0 9 * * *"     # daily at 9am
-fijjit unschedule <name>                       # remove from crontab
-fijjit init-config                             # print an example fijjit.toml
+fijit list                                    # show all scrapers
+fijit run <name>                              # run once
+fijit test-notify                             # send a test Slack message
+fijit schedule <name>                         # add to crontab (default: */30 * * * *)
+fijit schedule <name> --cron "0 9 * * *"     # daily at 9am
+fijit unschedule <name>                       # remove from crontab
+fijit init-config                             # print an example fijit.toml
 ```
 
 ---
@@ -195,10 +195,10 @@ fijjit init-config                             # print an example fijjit.toml
 ## Building from source
 
 ```bash
-git clone https://github.com/psedge/fijjit
-cd fijjit
+git clone https://github.com/psedge/fijit
+cd fijit
 cargo build --release
-# binary at: target/release/fijjit
+# binary at: target/release/fijit
 ```
 
 Requires Rust stable (≥ 1.75). Cross-compilation targets (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`) are built automatically on release by GitHub Actions.

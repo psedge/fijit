@@ -2,9 +2,9 @@
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
-//! Core traits and utilities for the fijjit scraper framework.
+//! Core traits and utilities for the fijit scraper framework.
 
-/// Global configuration loaded from `fijjit.toml`.
+/// Global configuration loaded from `fijit.toml`.
 pub mod config;
 /// DOM element type used as pipeline state.
 pub mod element;

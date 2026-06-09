@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "crates/fijjit-core",
-    "crates/fijjit-cli",
+    "crates/fijit-core",
+    "crates/fijit-cli",
 ]
 resolver = "2"
 
@@ -10,8 +10,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
-repository = "https://github.com/psedge/fijjit"
-homepage = "https://github.com/psedge/fijjit"
+repository = "https://github.com/psedge/fijit"
+homepage = "https://github.com/psedge/fijit"
 authors = ["Peter Sedgewick"]
 
 [workspace.dependencies]
@@ -23,7 +23,7 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env"] }
 regex = "1"
-fijjit-core = { path = "crates/fijjit-core" }
+fijit-core = { path = "crates/fijit-core" }
 
 [profile.release]
 opt-level = 3

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Global configuration loaded from `fijjit.toml` or `~/.config/fijjit/config.toml`.
+/// Global configuration loaded from `fijit.toml` or `~/.config/fijit/config.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// Path to the Obscura binary. Defaults to `/tmp/obscura`.
@@ -18,7 +18,7 @@ pub struct Config {
     pub scrapers: HashMap<String, ScraperConfig>,
 }
 
-/// Per-scraper overrides that can appear under `[scrapers.<name>]` in `fijjit.toml`.
+/// Per-scraper overrides that can appear under `[scrapers.<name>]` in `fijit.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ScraperConfig {
     /// Cron expression, e.g. `"*/30 * * * *"`
@@ -29,7 +29,7 @@ pub struct ScraperConfig {
 }
 
 impl Config {
-    /// Load config from `./fijjit.toml` or `~/.config/fijjit/config.toml`.
+    /// Load config from `./fijit.toml` or `~/.config/fijit/config.toml`.
     ///
     /// # Errors
     /// Returns an error if no config file is found or if parsing fails.
@@ -51,12 +51,12 @@ impl Config {
         })
     }
 
-    /// Resolve config path: `./fijjit.toml` → `~/.config/fijjit/config.toml`.
+    /// Resolve config path: `./fijit.toml` → `~/.config/fijit/config.toml`.
     ///
     /// # Errors
     /// Returns an error if neither path exists.
     pub fn find_path() -> Result<PathBuf> {
-        let local = PathBuf::from("fijjit.toml");
+        let local = PathBuf::from("fijit.toml");
         if local.exists() {
             return Ok(local);
         }
@@ -65,20 +65,20 @@ impl Config {
             return Ok(global);
         }
         Err(Error::Config(format!(
-            "no config found — create ./fijjit.toml or {}",
+            "no config found — create ./fijit.toml or {}",
             global.display()
         )))
     }
 
-    /// Write the current config to `./fijjit.toml`.
+    /// Write the current config to `./fijit.toml`.
     ///
     /// # Errors
     /// Returns an error if serialisation or the file write fails.
     pub fn save_to_local(&self) -> Result<()> {
         let s = toml::to_string_pretty(self)
             .map_err(|e| Error::Config(format!("serialising config: {e}")))?;
-        std::fs::write("fijjit.toml", s)
-            .map_err(|e| Error::Config(format!("writing fijjit.toml: {e}")))
+        std::fs::write("fijit.toml", s)
+            .map_err(|e| Error::Config(format!("writing fijit.toml: {e}")))
     }
 
     /// Return the Obscura binary path, defaulting to `/tmp/obscura`.
@@ -90,8 +90,8 @@ impl Config {
 
 fn global_config_dir() -> PathBuf {
     std::env::var("HOME").map_or_else(
-        |_| PathBuf::from(".config/fijjit"),
-        |h| PathBuf::from(h).join(".config").join("fijjit"),
+        |_| PathBuf::from(".config/fijit"),
+        |h| PathBuf::from(h).join(".config").join("fijit"),
     )
 }
 
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn load_or_default_does_not_panic_without_file() {
-        // Change to a temp dir with no fijjit.toml
+        // Change to a temp dir with no fijit.toml
         let dir = tempfile::tempdir().unwrap();
         let orig = std::env::current_dir().unwrap();
         std::env::set_current_dir(dir.path()).unwrap();

@@ -13,16 +13,16 @@ use std::path::Path;
 pub struct ScraperDef {
     /// Unique identifier used in CLI commands and crontab entries.
     pub name: String,
-    /// Human-readable description shown in `fijjit list`.
+    /// Human-readable description shown in `fijit list`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Page URL that `query_all` and `eval_json` steps will fetch.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// Default cron schedule displayed in `fijjit list`.
+    /// Default cron schedule displayed in `fijit list`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schedule: Option<String>,
-    /// Per-scraper Slack webhook — overrides the global value from `fijjit.toml`.
+    /// Per-scraper Slack webhook — overrides the global value from `fijit.toml`.
     /// Supports `${ENV_VAR}` interpolation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slack_webhook: Option<String>,
