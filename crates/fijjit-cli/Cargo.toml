@@ -1,0 +1,19 @@
+[package]
+name = "fijjit"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fijjit"
+path = "src/main.rs"
+
+[dependencies]
+fijjit-core = { workspace = true }
+bike-discount = { path = "../scrapers/bike-discount" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+tempfile = "3"
