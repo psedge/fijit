@@ -13,7 +13,8 @@ authors.workspace = true
 tempfile = "3"
 
 [dependencies]
-anyhow = { workspace = true }  # used in Scraper trait signature
+anyhow = { workspace = true }
+regex = { workspace = true }
 thiserror = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }

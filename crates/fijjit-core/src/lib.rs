@@ -4,10 +4,21 @@
 
 //! Core traits and utilities for the fijjit scraper framework.
 
+/// Global configuration loaded from `fijjit.toml`.
 pub mod config;
+/// DOM element type used as pipeline state.
+pub mod element;
+/// Typed error enum for the core library.
 pub mod error;
+/// Slack notification helpers.
 pub mod notify;
+/// Wrapper around the Obscura headless browser binary.
 pub mod obscura;
+/// Config-driven pipeline executor and scraper loader.
+pub mod pipeline;
+/// `Scraper` trait and `ScrapeResult` type.
 pub mod scraper;
+/// Declarative pipeline step types.
+pub mod step;
 
 pub use error::Error;

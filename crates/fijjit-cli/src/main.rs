@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use fijjit_core::{
     config::Config,
     notify,
+    pipeline::load_scraper_files,
     scraper::{ScrapeResult, Scraper},
 };
 
@@ -43,9 +44,11 @@ enum Cmd {
     InitConfig,
 }
 
-fn load_scrapers(_config: &Config) -> Vec<Box<dyn Scraper>> {
-    // Config-driven scrapers are loaded here once the pipeline runner is implemented.
-    vec![]
+fn load_scrapers(config: &Config) -> Vec<Box<dyn Scraper>> {
+    load_scraper_files(config)
+        .into_iter()
+        .map(|s| Box::new(s) as Box<dyn Scraper>)
+        .collect()
 }
 
 fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a dyn Scraper> {
@@ -57,32 +60,32 @@ fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a 
 }
 
 fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
+    let webhook = scraper
+        .slack_webhook()
+        .or_else(|| config.slack_webhook.clone());
+
     println!("[{}] checking…", scraper.name());
     match scraper.check()? {
         ScrapeResult::NoChange => println!("[{}] no change", scraper.name()),
         ScrapeResult::Alert(msg) => {
             println!("[{}] ALERT: {}", scraper.name(), msg);
-            notify::slack_if_configured(config.slack_webhook.as_deref(), &msg);
+            notify::slack_if_configured(webhook.as_deref(), &msg);
         }
         ScrapeResult::Alerts(msgs) => {
             for msg in &msgs {
                 println!("[{}] ALERT: {}", scraper.name(), msg);
-                notify::slack_if_configured(config.slack_webhook.as_deref(), msg);
+                notify::slack_if_configured(webhook.as_deref(), msg);
             }
         }
     }
     Ok(())
 }
 
-fn cmd_list(scrapers: &[Box<dyn Scraper>], config: &Config) {
+fn cmd_list(scrapers: &[Box<dyn Scraper>]) {
     println!("{:<20} {:<12} DESCRIPTION", "NAME", "SCHEDULE");
     println!("{}", "-".repeat(70));
     for s in scrapers {
-        let schedule = config
-            .scrapers
-            .get(s.name())
-            .and_then(|c| c.schedule.as_deref())
-            .unwrap_or("—");
+        let schedule = s.schedule().unwrap_or("—");
         println!("{:<20} {:<12} {}", s.name(), schedule, s.description());
     }
 }
@@ -144,6 +147,9 @@ fn cmd_init_config() {
 
 obscura_path = "/usr/local/bin/obscura"
 slack_webhook = "https://hooks.slack.com/services/..."
+
+# [vars]
+# MY_API_KEY = "secret"
 "#
     );
 }
@@ -158,7 +164,7 @@ fn main() -> Result<()> {
             let scraper = find_scraper(&scrapers, name)?;
             run_scraper(scraper, &config)?;
         }
-        Cmd::List => cmd_list(&scrapers, &config),
+        Cmd::List => cmd_list(&scrapers),
         Cmd::TestNotify => {
             let msg = "🧪 *fijjit test* — notifications are working!";
             notify::slack_if_configured(config.slack_webhook.as_deref(), msg);

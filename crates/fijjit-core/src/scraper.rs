@@ -19,5 +19,19 @@ pub trait Scraper: Send + Sync {
     /// Run one check and return what changed (if anything).
     ///
     /// Uses `anyhow::Result` so scrapers can use `?` with any error type.
+    ///
+    /// # Errors
+    /// Returns an error if the scraper encounters a fatal problem (network, parse, etc.).
     fn check(&self) -> anyhow::Result<ScrapeResult>;
+
+    /// Per-scraper Slack webhook, overriding the global config value.
+    /// Return `None` to fall back to the global webhook.
+    fn slack_webhook(&self) -> Option<String> {
+        None
+    }
+
+    /// Default cron schedule, shown in `fijjit list`.
+    fn schedule(&self) -> Option<&str> {
+        None
+    }
 }

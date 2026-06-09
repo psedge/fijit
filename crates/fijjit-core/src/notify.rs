@@ -2,6 +2,9 @@ use crate::error::{Error, Result};
 use serde_json::json;
 
 /// Send a Slack message via incoming webhook.
+///
+/// # Errors
+/// Returns an error if the HTTP request fails or Slack returns a non-2xx status.
 pub fn slack(webhook: &str, message: &str) -> Result<()> {
     let resp = reqwest::blocking::Client::new()
         .post(webhook)

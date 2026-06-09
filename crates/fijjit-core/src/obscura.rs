@@ -1,11 +1,14 @@
 use crate::error::{Error, Result};
 use std::process::Command;
 
+/// Runs the Obscura headless browser binary and returns its output.
 pub struct ObscuraRunner {
+    /// Path to the Obscura binary.
     pub binary: String,
 }
 
 impl ObscuraRunner {
+    /// Create a new runner pointing at `binary`.
     pub fn new(binary: impl Into<String>) -> Self {
         Self {
             binary: binary.into(),
@@ -13,6 +16,9 @@ impl ObscuraRunner {
     }
 
     /// Fetch a page with stealth mode, evaluate JS, and return stdout.
+    ///
+    /// # Errors
+    /// Returns an error if Obscura cannot be spawned or exits non-zero.
     pub fn eval(&self, url: &str, script: &str, wait_secs: u64) -> Result<String> {
         let output = Command::new(&self.binary)
             .args([
@@ -43,6 +49,9 @@ impl ObscuraRunner {
     }
 
     /// Like `eval`, but extracts the first JSON line (`[` or `{`) from the output.
+    ///
+    /// # Errors
+    /// Returns an error if Obscura fails or the output contains no JSON line.
     pub fn eval_json(&self, url: &str, script: &str, wait_secs: u64) -> Result<String> {
         let raw = self.eval(url, script, wait_secs)?;
         extract_json(&raw).ok_or_else(|| Error::NoJson(raw.chars().take(400).collect()))

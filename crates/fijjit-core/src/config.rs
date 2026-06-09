@@ -3,15 +3,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// Global configuration loaded from `fijjit.toml` or `~/.config/fijjit/config.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
+    /// Path to the Obscura binary. Defaults to `/tmp/obscura`.
     pub obscura_path: Option<String>,
+    /// Global Slack webhook URL. Supports `${ENV_VAR}` interpolation.
     pub slack_webhook: Option<String>,
-
+    /// Global template variables available in all scraper message templates.
+    #[serde(default)]
+    pub vars: HashMap<String, String>,
+    /// Per-scraper overrides keyed by scraper name.
     #[serde(default)]
     pub scrapers: HashMap<String, ScraperConfig>,
 }
 
+/// Per-scraper overrides that can appear under `[scrapers.<name>]` in `fijjit.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ScraperConfig {
     /// Cron expression, e.g. `"*/30 * * * *"`
@@ -23,6 +30,9 @@ pub struct ScraperConfig {
 
 impl Config {
     /// Load config from `./fijjit.toml` or `~/.config/fijjit/config.toml`.
+    ///
+    /// # Errors
+    /// Returns an error if no config file is found or if parsing fails.
     pub fn load() -> Result<Self> {
         let path = Self::find_path()?;
         let raw = std::fs::read_to_string(&path)
@@ -31,15 +41,20 @@ impl Config {
     }
 
     /// Like `load`, but returns an empty default if no config file is found.
+    #[must_use]
     pub fn load_or_default() -> Self {
         Self::load().unwrap_or_else(|_| Config {
             obscura_path: None,
             slack_webhook: None,
+            vars: HashMap::new(),
             scrapers: HashMap::new(),
         })
     }
 
     /// Resolve config path: `./fijjit.toml` → `~/.config/fijjit/config.toml`.
+    ///
+    /// # Errors
+    /// Returns an error if neither path exists.
     pub fn find_path() -> Result<PathBuf> {
         let local = PathBuf::from("fijjit.toml");
         if local.exists() {
@@ -55,6 +70,10 @@ impl Config {
         )))
     }
 
+    /// Write the current config to `./fijjit.toml`.
+    ///
+    /// # Errors
+    /// Returns an error if serialisation or the file write fails.
     pub fn save_to_local(&self) -> Result<()> {
         let s = toml::to_string_pretty(self)
             .map_err(|e| Error::Config(format!("serialising config: {e}")))?;
@@ -62,15 +81,18 @@ impl Config {
             .map_err(|e| Error::Config(format!("writing fijjit.toml: {e}")))
     }
 
+    /// Return the Obscura binary path, defaulting to `/tmp/obscura`.
+    #[must_use]
     pub fn obscura(&self) -> &str {
         self.obscura_path.as_deref().unwrap_or("/tmp/obscura")
     }
 }
 
 fn global_config_dir() -> PathBuf {
-    std::env::var("HOME")
-        .map(|h| PathBuf::from(h).join(".config").join("fijjit"))
-        .unwrap_or_else(|_| PathBuf::from(".config/fijjit"))
+    std::env::var("HOME").map_or_else(
+        |_| PathBuf::from(".config/fijjit"),
+        |h| PathBuf::from(h).join(".config").join("fijjit"),
+    )
 }
 
 #[cfg(test)]
@@ -113,6 +135,7 @@ mod tests {
         let config = Config {
             obscura_path: None,
             slack_webhook: None,
+            vars: HashMap::new(),
             scrapers: HashMap::new(),
         };
         assert_eq!(config.obscura(), "/tmp/obscura");
