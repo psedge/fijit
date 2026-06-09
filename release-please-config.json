@@ -14,6 +14,7 @@
     { "type": "perf",     "section": "Performance" },
     { "type": "refactor", "section": "Refactors", "hidden": true },
     { "type": "chore",    "section": "Miscellaneous", "hidden": true },
-    { "type": "ci",       "section": "CI", "hidden": true }
+    { "type": "ci",       "section": "CI", "hidden": true },
+    { "type": "docs",     "section": "Documentation", "hidden": true }
   ]
 }

@@ -170,10 +170,22 @@ fn eval_op(field_val: &str, op: &Op, value: &str) -> bool {
 
 fn json_to_element(val: &serde_json::Value) -> Element {
     Element {
-        text: val["text"].as_str().filter(|s| !s.is_empty()).map(str::to_owned),
-        class: val["class"].as_str().filter(|s| !s.is_empty()).map(str::to_owned),
-        href: val["href"].as_str().filter(|s| !s.is_empty()).map(str::to_owned),
-        value: val["value"].as_str().filter(|s| !s.is_empty()).map(str::to_owned),
+        text: val["text"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned),
+        class: val["class"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned),
+        href: val["href"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned),
+        value: val["value"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned),
     }
 }
 
@@ -236,7 +248,10 @@ fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
 fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> Result<()> {
     match step.action {
         Action::QueryAll => {
-            let selector = step.selector.as_deref().context("query_all requires 'selector'")?;
+            let selector = step
+                .selector
+                .as_deref()
+                .context("query_all requires 'selector'")?;
             let selector = interpolate_env(selector);
             let selector_js = serde_json::to_string(&selector).unwrap_or_default();
             let script = format!(
@@ -244,14 +259,21 @@ fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> R
                  ({{text: el.textContent.replace(/\\s+/g,' ').trim(), class: el.className, \
                    href: el.getAttribute('href'), value: el.getAttribute('value')}})))"
             );
-            let json = ctx.obscura.eval_json(ctx.url, &script, step.wait.unwrap_or(3))?;
+            let json = ctx
+                .obscura
+                .eval_json(ctx.url, &script, step.wait.unwrap_or(3))?;
             let vals: Vec<serde_json::Value> =
                 serde_json::from_str(&json).context("query_all: expected JSON array")?;
             ps.elements = vals.iter().map(json_to_element).collect();
         }
         Action::EvalJson => {
-            let script = step.script.as_deref().context("eval_json requires 'script'")?;
-            let json = ctx.obscura.eval_json(ctx.url, script, step.wait.unwrap_or(3))?;
+            let script = step
+                .script
+                .as_deref()
+                .context("eval_json requires 'script'")?;
+            let json = ctx
+                .obscura
+                .eval_json(ctx.url, script, step.wait.unwrap_or(3))?;
             let vals: Vec<serde_json::Value> =
                 serde_json::from_str(&json).context("eval_json: expected JSON array")?;
             ps.elements = vals.iter().map(json_to_element).collect();
@@ -297,7 +319,10 @@ fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> R
             let field = step.field.as_deref().context("alert_if requires 'field'")?;
             let op = step.op.as_ref().context("alert_if requires 'op'")?;
             let value = step.value.as_deref().context("alert_if requires 'value'")?;
-            let message = step.message.as_deref().context("alert_if requires 'message'")?;
+            let message = step
+                .message
+                .as_deref()
+                .context("alert_if requires 'message'")?;
             if let Some(el) = ps
                 .elements
                 .iter()
@@ -308,16 +333,28 @@ fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> R
             }
         }
         Action::AlertIfEmpty => {
-            let message = step.message.as_deref().context("alert_if_empty requires 'message'")?;
+            let message = step
+                .message
+                .as_deref()
+                .context("alert_if_empty requires 'message'")?;
             if ps.elements.is_empty() {
                 ps.alerts.push(interpolate_template(message, &ps.vars));
             }
         }
         Action::AlertIfAny => {
-            let field = step.field.as_deref().context("alert_if_any requires 'field'")?;
+            let field = step
+                .field
+                .as_deref()
+                .context("alert_if_any requires 'field'")?;
             let op = step.op.as_ref().context("alert_if_any requires 'op'")?;
-            let value = step.value.as_deref().context("alert_if_any requires 'value'")?;
-            let message = step.message.as_deref().context("alert_if_any requires 'message'")?;
+            let value = step
+                .value
+                .as_deref()
+                .context("alert_if_any requires 'value'")?;
+            let message = step
+                .message
+                .as_deref()
+                .context("alert_if_any requires 'message'")?;
             let matches: Vec<HashMap<String, String>> = ps
                 .elements
                 .iter()
@@ -348,7 +385,10 @@ mod tests {
     #[test]
     fn interpolate_env_replaces_known_var() {
         std::env::set_var("FIJJIT_TEST_VAR", "hello");
-        assert_eq!(interpolate_env("prefix_${FIJJIT_TEST_VAR}_suffix"), "prefix_hello_suffix");
+        assert_eq!(
+            interpolate_env("prefix_${FIJJIT_TEST_VAR}_suffix"),
+            "prefix_hello_suffix"
+        );
     }
 
     #[test]
