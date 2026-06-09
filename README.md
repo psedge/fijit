@@ -178,6 +178,23 @@ fijit unschedule <name>                      # remove from crontab
 fijit init-config                            # print an example fijit.toml
 ```
 
+## Scheduling
+
+`fijit schedule` writes an entry to the user's crontab. Run it from the directory that contains `fijit.toml` — the entry records the working directory and uses the absolute path to the binary, so it works correctly when cron runs it later.
+
+Common cron expressions:
+
+| Expression | Meaning |
+|---|---|
+| `*/30 * * * *` | Every 30 minutes |
+| `0 * * * *` | Every hour |
+| `0 9 * * *` | Daily at 9am |
+| `0 9 * * 1-5` | Weekdays at 9am |
+
+To see scheduled scrapers: `crontab -l`
+
+To remove one: `fijit unschedule <name>`
+
 ---
 
 ## Building from source
