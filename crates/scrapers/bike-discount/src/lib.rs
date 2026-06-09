@@ -1,3 +1,5 @@
+#![deny(unsafe_code)]
+
 use anyhow::Result;
 use fijjit_core::{
     obscura::ObscuraRunner,
@@ -67,5 +69,71 @@ fn stock_label(class: &str) -> &str {
         "~ 6+ weeks"
     } else {
         "✗ unavailable"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stock_label_in_stock() {
+        assert_eq!(
+            stock_label(
+                "nele-product-detail-configurator-option nele-stock-info dropdown-item --stock-1"
+            ),
+            "✓ in stock"
+        );
+    }
+
+    #[test]
+    fn stock_label_backordered() {
+        assert_eq!(
+            stock_label(
+                "nele-product-detail-configurator-option nele-stock-info dropdown-item --stock-4"
+            ),
+            "~ 6+ weeks"
+        );
+    }
+
+    #[test]
+    fn stock_label_unavailable() {
+        assert_eq!(stock_label("nele-stock-info --stock-99"), "✗ unavailable");
+    }
+
+    #[test]
+    fn parses_variant_json() {
+        let json = r#"[
+            {"text": "54 cm", "class": "nele-stock-info --stock-1"},
+            {"text": "58 cm", "class": "nele-stock-info --stock-4"}
+        ]"#;
+        let variants: Vec<Variant> = serde_json::from_str(json).unwrap();
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0].text, "54 cm");
+        assert!(variants[1].class.contains("--stock-4"));
+    }
+
+    #[test]
+    fn no_alert_when_target_backordered() {
+        let variants: Vec<Variant> = serde_json::from_str(
+            r#"[
+            {"text": "58 cm", "class": "nele-stock-info --stock-4"}
+        ]"#,
+        )
+        .unwrap();
+        let target = variants.iter().find(|v| v.text == TARGET_SIZE);
+        assert!(matches!(target, Some(v) if !v.class.contains(IN_STOCK_CLASS)));
+    }
+
+    #[test]
+    fn alert_when_target_in_stock() {
+        let variants: Vec<Variant> = serde_json::from_str(
+            r#"[
+            {"text": "58 cm", "class": "nele-stock-info --stock-1"}
+        ]"#,
+        )
+        .unwrap();
+        let target = variants.iter().find(|v| v.text == TARGET_SIZE);
+        assert!(matches!(target, Some(v) if v.class.contains(IN_STOCK_CLASS)));
     }
 }

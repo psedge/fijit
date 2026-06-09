@@ -1,7 +1,13 @@
 [package]
 name = "bike-discount"
-version = "0.1.0"
-edition = "2021"
+description = "fijjit scraper — Cube Editor Pro 58cm availability on bike-discount.de"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 
 [dependencies]
 fijjit-core = { workspace = true }

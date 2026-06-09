@@ -1,10 +1,20 @@
 [package]
 name = "fijjit-core"
-version = "0.1.0"
-edition = "2021"
+description = "Core traits and utilities for the fijjit scraper framework"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
 
 [dependencies]
-anyhow = { workspace = true }
+anyhow = { workspace = true }  # used in Scraper trait signature
+thiserror = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
