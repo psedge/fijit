@@ -1,0 +1,30 @@
+[workspace]
+members = [
+    "crates/fijit-core",
+    "crates/fijit-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+repository = "https://github.com/psedge/fijit"
+homepage = "https://github.com/psedge/fijit"
+authors = ["Peter Sedgewick"]
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+chrono = "0.4"
+clap = { version = "4", features = ["derive", "env"] }
+regex = "1"
+fijit-core = { path = "crates/fijit-core" }
+
+[profile.release]
+opt-level = 3
+strip = true
