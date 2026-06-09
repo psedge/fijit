@@ -15,7 +15,6 @@ path = "src/main.rs"
 
 [dependencies]
 fijjit-core = { workspace = true }
-bike-discount = { path = "../scrapers/bike-discount" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -2,7 +2,6 @@
 members = [
     "crates/fijjit-core",
     "crates/fijjit-cli",
-    "crates/scrapers/bike-discount",
 ]
 resolver = "2"
 

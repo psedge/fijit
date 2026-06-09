@@ -1,7 +1,6 @@
 #![deny(unsafe_code)]
 
 use anyhow::{bail, Result};
-use bike_discount::BikeDiscountScraper;
 use clap::{Parser, Subcommand};
 use fijjit_core::{
     config::Config,
@@ -44,8 +43,9 @@ enum Cmd {
     InitConfig,
 }
 
-fn load_scrapers(config: &Config) -> Vec<Box<dyn Scraper>> {
-    vec![Box::new(BikeDiscountScraper::new(config.obscura()))]
+fn load_scrapers(_config: &Config) -> Vec<Box<dyn Scraper>> {
+    // Config-driven scrapers are loaded here once the pipeline runner is implemented.
+    vec![]
 }
 
 fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a dyn Scraper> {
@@ -92,14 +92,10 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
 
     let binary = std::env::current_exe()?.to_string_lossy().into_owned();
     let cron_dir = std::env::current_dir()?.to_string_lossy().into_owned();
-
-    // The cron entry: cd to project dir so fijjit.toml is found, then run
     let entry = format!("{cron}\tcd {cron_dir} && {binary} run {name}");
     let tag = format!("# fijjit:{name}");
 
     let existing = read_crontab()?;
-
-    // Remove any existing fijjit entry for this scraper
     let filtered: Vec<&str> = existing
         .lines()
         .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijjit run {name}")))
@@ -127,13 +123,12 @@ fn cmd_unschedule(name: &str) -> Result<()> {
 
 fn read_crontab() -> Result<String> {
     let out = std::process::Command::new("crontab").arg("-l").output()?;
-    // crontab -l exits non-zero if no crontab exists — that's fine
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn write_crontab(contents: &str) -> Result<()> {
     use std::io::Write;
-    let mut tmp = tempfile()?;
+    let mut tmp = tempfile::NamedTempFile::new()?;
     tmp.write_all(contents.as_bytes())?;
     let path = tmp.path().to_owned();
     let status = std::process::Command::new("crontab").arg(&path).status()?;
@@ -143,19 +138,12 @@ fn write_crontab(contents: &str) -> Result<()> {
     Ok(())
 }
 
-fn tempfile() -> Result<tempfile::NamedTempFile> {
-    Ok(tempfile::NamedTempFile::new()?)
-}
-
 fn cmd_init_config() {
     println!(
         r#"# fijjit.toml
 
-obscura_path = "/tmp/obscura"
+obscura_path = "/usr/local/bin/obscura"
 slack_webhook = "https://hooks.slack.com/services/..."
-
-[scrapers.bike-discount]
-schedule = "*/30 * * * *"
 "#
     );
 }
