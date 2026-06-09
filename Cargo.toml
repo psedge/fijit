@@ -1,0 +1,21 @@
+[workspace]
+members = [
+    "crates/fijjit-core",
+    "crates/fijjit-cli",
+    "crates/scrapers/bike-discount",
+]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+chrono = "0.4"
+clap = { version = "4", features = ["derive", "env"] }
+fijjit-core = { path = "crates/fijjit-core" }
+
+[profile.release]
+opt-level = 3
+strip = true
