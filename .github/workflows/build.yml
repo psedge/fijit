@@ -1,10 +1,13 @@
 name: Build
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to build and upload (e.g. v0.2.0)
+        description: Release tag to build and upload (e.g. v0.3.0)
         required: true
 
 permissions:
@@ -31,8 +34,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -56,12 +57,14 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          ASSET="${{ env.BINARY }}-${{ github.event.inputs.tag }}-${{ matrix.target }}.tar.gz"
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          ASSET="${{ env.BINARY }}-${TAG}-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" -C "target/${{ matrix.target }}/release" "${{ env.BINARY }}"
           echo "ASSET=$ASSET" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag }}
+          tag_name: ${{ env.TAG }}
           files: ${{ env.ASSET }}
