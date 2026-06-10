@@ -11,6 +11,70 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs['crates/fijit-cli--release_created'] }}
+      tag_name: ${{ steps.release.outputs['crates/fijit-cli--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+      BINARY: fijit
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: cargo build --release --bin ${{ env.BINARY }} --target ${{ matrix.target }}
+
+      - name: Package
+        shell: bash
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          ASSET="${{ env.BINARY }}-${TAG}-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" -C "target/${{ matrix.target }}/release" "${{ env.BINARY }}"
+          echo "ASSET=$ASSET" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: ${{ env.ASSET }}
