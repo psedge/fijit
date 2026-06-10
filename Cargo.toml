@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/fijit-cli",
+    "crates/fijit",
 ]
 resolver = "2"
 

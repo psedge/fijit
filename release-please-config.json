@@ -3,7 +3,7 @@
   "release-type": "rust",
   "versioning": "always-bump-patch",
   "packages": {
-    "crates/fijit-cli": {
+    "crates/fijit": {
       "component": "fijit",
       "release-type": "rust",
       "changelog-path": "CHANGELOG.md"
