@@ -6,8 +6,7 @@
     "crates/fijit-cli": {
       "component": "fijit",
       "release-type": "rust",
-      "changelog-path": "CHANGELOG.md",
-      "include-paths": ["crates/fijit-core", "crates/fijit-cli"]
+      "changelog-path": "CHANGELOG.md"
     }
   },
   "include-component-in-tag": false,
