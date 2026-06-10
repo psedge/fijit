@@ -6,6 +6,13 @@ on:
       tag:
         description: Release tag to build and upload (e.g. v0.3.0)
         required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to build and upload (e.g. v0.3.0)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -32,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ inputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -56,7 +63,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ inputs.tag }}"
           ASSET="${{ env.BINARY }}-${TAG}-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" -C "target/${{ matrix.target }}/release" "${{ env.BINARY }}"
           echo "ASSET=$ASSET" >> $GITHUB_ENV
