@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/psedge/fijit/compare/v0.4.0...v0.4.1) (2026-06-10)
+
+
+### Features
+
+* document filter/find operators in init-config template ([6d29979](https://github.com/psedge/fijit/commit/6d29979cc1a3e7ebf1798b7719c3b7ac59fc07bf))
+
 ## [0.4.0](https://github.com/psedge/fijit/compare/v0.3.0...v0.4.0) (2026-06-10)
 
 
