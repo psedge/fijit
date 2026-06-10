@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/fijit-core",
     "crates/fijit-cli",
 ]
 resolver = "2"
@@ -23,7 +22,6 @@ reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], def
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env"] }
 regex = "1"
-fijit-core = { path = "crates/fijit-core" }
 
 [profile.release]
 opt-level = 3

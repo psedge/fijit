@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-/// All errors that can originate from `fijit-core`.
+/// All errors that can originate from fijit's scraping pipeline.
 #[derive(Debug, Error)]
 pub enum Error {
     /// The Obscura process exited with a non-zero status or could not be spawned.

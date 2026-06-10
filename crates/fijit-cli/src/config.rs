@@ -70,17 +70,6 @@ impl Config {
         )))
     }
 
-    /// Write the current config to `./fijit.toml`.
-    ///
-    /// # Errors
-    /// Returns an error if serialisation or the file write fails.
-    pub fn save_to_local(&self) -> Result<()> {
-        let s = toml::to_string_pretty(self)
-            .map_err(|e| Error::Config(format!("serialising config: {e}")))?;
-        std::fs::write("fijit.toml", s)
-            .map_err(|e| Error::Config(format!("writing fijit.toml: {e}")))
-    }
-
     /// Return the Obscura binary path, defaulting to `/tmp/obscura`.
     #[must_use]
     pub fn obscura(&self) -> &str {

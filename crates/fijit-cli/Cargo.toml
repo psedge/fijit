@@ -14,11 +14,13 @@ name = "fijit"
 path = "src/main.rs"
 
 [dependencies]
-fijit-core = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
 clap = { workspace = true }
 chrono = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+thiserror = "2"
 tempfile = "3"

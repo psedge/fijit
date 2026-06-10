@@ -1,13 +1,19 @@
 #![deny(unsafe_code)]
 
+mod config;
+mod element;
+mod error;
+mod notify;
+mod obscura;
+mod pipeline;
+mod scraper;
+mod step;
+
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use fijit_core::{
-    config::Config,
-    notify,
-    pipeline::{interpolate_template, load_scraper_files},
-    scraper::{ScrapeResult, Scraper},
-};
+use config::Config;
+use pipeline::{interpolate_template, load_scraper_files};
+use scraper::{ScrapeResult, Scraper};
 
 #[derive(Parser)]
 #[command(name = "fijit", about = "Lightweight web scraper framework")]
