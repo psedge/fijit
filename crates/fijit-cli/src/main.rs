@@ -186,6 +186,8 @@ const INIT_CONFIG_TEMPLATE: &str = "\
 #           fijit list                show all scrapers
 #
 # Pipeline actions: query_all, eval_json, filter, find, set, map, alert, log
+# Filter/find ops:  eq, not_eq, contains, not_contains, starts_with, ends_with,
+#                   matches (regex), gt, lt, gte, lte (numeric, e.g. price < 100)
 # Alert triggers:   on = \"any\" | \"each\" | \"empty\" | \"change\"
 
 obscura_path = \"/usr/local/bin/obscura\"
