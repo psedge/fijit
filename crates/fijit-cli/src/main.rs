@@ -150,8 +150,12 @@ const INIT_CONFIG_TEMPLATE: &str = "\
 # fijit.toml — global config (gitignored, keep your secrets here)
 #
 # Scrapers live in scrapers/*.toml (also gitignored).
-# Run: fijit run <name>   to test a scraper
-#      fijit schedule <name>   to add it to crontab
+# Run:      fijit run <name>          test a scraper
+#           fijit schedule <name>     add to crontab
+#           fijit list                show all scrapers
+#
+# Pipeline actions: query_all, eval_json, filter, find, set, map, alert, log
+# Alert triggers:   on = \"any\" | \"each\" | \"empty\" | \"change\"
 
 obscura_path = \"/usr/local/bin/obscura\"
 slack_webhook = \"https://hooks.slack.com/services/...\"
