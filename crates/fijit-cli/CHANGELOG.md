@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/psedge/fijit/compare/v0.3.0...v0.4.0) (2026-06-10)
+
+
+### Features
+
+* log scraper output to per-scraper file in fijit schedule ([c32ba4d](https://github.com/psedge/fijit/commit/c32ba4d9c4729df9f723bf1cbe9036814892869d))
+* on_error block sends scraper errors to Slack ([c76db8b](https://github.com/psedge/fijit/commit/c76db8bb0d54872198e12859081b90ce90086f5c))
+
+
+### Bug Fixes
+
+* log to /var/log/fijit/&lt;name&gt;.log instead of ~/.local ([a326e33](https://github.com/psedge/fijit/commit/a326e33ddd9fd4e3682ea72e14242e5a4c9b6689))
+* verify /var/log/fijit is writable in fijit schedule with helpful error ([8f46900](https://github.com/psedge/fijit/commit/8f46900ab77e48f5d3785eec0cef5cacc3390c88))
+
 ## [0.3.0](https://github.com/psedge/fijit/compare/v0.2.0...v0.3.0) (2026-06-10)
 
 
