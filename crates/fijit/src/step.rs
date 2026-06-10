@@ -2,83 +2,103 @@ use serde::{Deserialize, Serialize};
 
 /// A single declarative step in a scraper pipeline.
 ///
-/// Which fields are required depends on `action` — see each variant's documentation.
+/// Steps are internally tagged by `action` in TOML, and each variant carries
+/// exactly the fields that action needs — so a config that omits a required
+/// field (or supplies one that doesn't apply) fails at parse time rather than
+/// during execution.
+///
+/// ```toml
+/// [[steps]]
+/// action = "query_all"
+/// selector = ".product"
+/// attrs = ["data-price"]
+/// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Step {
-    /// What this step does.
-    pub action: Action,
-    /// CSS selector (required by `query_all`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub selector: Option<String>,
-    /// Extra HTML attributes for `query_all` to capture beyond the built-in
-    /// `text`/`class`/`href`/`value`, e.g. `["data-price", "aria-label"]`. Each
-    /// becomes addressable by `field` (in `filter`/`find`) and as a `{name}`
-    /// template variable in `alert` messages.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attrs: Option<Vec<String>>,
-    /// JavaScript expression (required by `eval_json`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub script: Option<String>,
-    /// Element field to inspect: a built-in (`"text"`, `"class"`, `"href"`,
-    /// `"value"`) or any attribute captured via `query_all`'s `attrs`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub field: Option<String>,
-    /// Comparison operator (required by `filter`; optional on `find`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub op: Option<Op>,
-    /// The value to compare against, or a literal value for `set`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-    /// Variable name to write to (used by `set` and `map`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub var: Option<String>,
-    /// Slack message template (required by `alert`).
-    /// Supports `{url}`, `{text}`, `{class}`, `{href}`, `{value}`, and custom `[vars]`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    /// Seconds to wait after page load before evaluating (default: 3).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub wait: Option<u64>,
-    /// Assumed initial value for `alert` with `on = "change"` when no prior state exists.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default: Option<String>,
-    /// Trigger mode for `alert` (default: `"any"`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub on: Option<AlertTrigger>,
-    /// Stable identifier for the persisted state of an `alert` with `on = "change"`.
-    /// State is stored under this id, so it survives inserting or reordering other
-    /// steps. When omitted, state falls back to the step's position, which shifts
-    /// if the pipeline changes — set an `id` on change alerts to avoid spurious alerts.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-}
-
-/// The operation a pipeline step performs.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Action {
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum Step {
     /// Fetch the scraper URL and query all elements matching a CSS `selector`.
     /// Replaces the current element list with the matches.
-    QueryAll,
+    QueryAll {
+        /// CSS selector to match.
+        selector: String,
+        /// Extra HTML attributes to capture beyond the built-in
+        /// `text`/`class`/`href`/`value`, e.g. `["data-price", "aria-label"]`.
+        /// Each becomes addressable by `field` and as a `{name}` template var.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        attrs: Vec<String>,
+        /// Seconds to wait after page load before evaluating (default: 3).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        wait: Option<u64>,
+    },
     /// Fetch the scraper URL, evaluate a JS `script`, and parse the JSON result.
     /// Replaces the current element list with the parsed elements.
-    EvalJson,
+    EvalJson {
+        /// JavaScript expression returning a JSON array of elements.
+        script: String,
+        /// Seconds to wait after page load before evaluating (default: 3).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        wait: Option<u64>,
+    },
     /// Keep only the first element whose `field` matches `value` (optionally via `op`).
-    Find,
+    Find {
+        /// Element field to inspect (a built-in or a captured attribute).
+        field: String,
+        /// Comparison operator. Defaults to exact equality when omitted.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        op: Option<Op>,
+        /// Value to compare against.
+        value: String,
+    },
     /// Keep all elements whose `field` satisfies `op` against `value`.
-    Filter,
+    Filter {
+        /// Element field to inspect (a built-in or a captured attribute).
+        field: String,
+        /// Comparison operator.
+        op: Op,
+        /// Value to compare against.
+        value: String,
+    },
     /// Store a literal `value` into a named `var`.
-    Set,
+    Set {
+        /// Variable name to write to.
+        var: String,
+        /// Literal value (supports `${ENV_VAR}` interpolation).
+        value: String,
+    },
     /// Collect `field` from all elements and join them into a named `var`.
-    Map,
+    Map {
+        /// Element field to collect.
+        field: String,
+        /// Variable name to write the comma-joined result to.
+        var: String,
+    },
     /// Emit a Slack alert. Trigger behaviour is controlled by `on` (default: `"any"`).
-    Alert,
+    Alert {
+        /// Slack message template. Supports `{url}`, `{text}`, `{class}`,
+        /// `{href}`, `{value}`, captured attributes, and custom `[vars]`.
+        message: String,
+        /// Trigger mode (default: `"any"`).
+        #[serde(default, skip_serializing_if = "AlertTrigger::is_default")]
+        on: AlertTrigger,
+        /// Field to watch — required when `on = "change"`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        field: Option<String>,
+        /// Assumed initial value for `on = "change"` when no prior state exists.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        default: Option<String>,
+        /// Stable identifier for the persisted state of an `on = "change"` alert.
+        /// State is stored under this id, so it survives inserting or reordering
+        /// other steps. When omitted, state falls back to the step's position,
+        /// which shifts if the pipeline changes — set an `id` to avoid spurious alerts.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
     /// Print the current element list to stdout.
     Log,
 }
 
 /// Controls when an `alert` step fires.
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertTrigger {
     /// Fire once when the element list is non-empty. Uses the first element's fields
@@ -93,6 +113,14 @@ pub enum AlertTrigger {
     /// State is persisted between runs. Use `default` to set the assumed initial value.
     /// No-op when the element list is empty.
     Change,
+}
+
+impl AlertTrigger {
+    /// Whether this is the default trigger (`Any`); used to skip serialization.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        matches!(self, AlertTrigger::Any)
+    }
 }
 
 /// A binary comparison operator.

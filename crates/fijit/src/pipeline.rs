@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::element::Element;
 use crate::obscura::ObscuraRunner;
 use crate::scraper::{ScrapeResult, Scraper};
-use crate::step::{Action, AlertTrigger, Op, Step};
+use crate::step::{AlertTrigger, Op, Step};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -355,18 +355,15 @@ fn execute_step(
     ps: &mut PipelineState,
     step_idx: usize,
 ) -> Result<()> {
-    match step.action {
-        Action::QueryAll => {
-            let selector = step
-                .selector
-                .as_deref()
-                .context("query_all requires 'selector'")?;
+    match step {
+        Step::QueryAll {
+            selector,
+            attrs,
+            wait,
+        } => {
             let selector = interpolate_env(selector);
             let selector_js = serde_json::to_string(&selector).unwrap_or_default();
-            let attrs_js = step
-                .attrs
-                .as_deref()
-                .unwrap_or_default()
+            let attrs_js = attrs
                 .iter()
                 .map(|a| {
                     let key = serde_json::to_string(a).unwrap_or_default();
@@ -380,110 +377,92 @@ fn execute_step(
                    href: el.getAttribute('href'), value: el.getAttribute('value'), \
                    attrs: {{{attrs_js}}}}})))"
             );
-            let json = ctx
-                .obscura
-                .eval_json(ctx.url, &script, step.wait.unwrap_or(3))?;
+            let json = ctx.obscura.eval_json(ctx.url, &script, wait.unwrap_or(3))?;
             let vals: Vec<serde_json::Value> =
                 serde_json::from_str(&json).context("query_all: expected JSON array")?;
             ps.elements = vals.iter().map(json_to_element).collect();
         }
-        Action::EvalJson => {
-            let script = step
-                .script
-                .as_deref()
-                .context("eval_json requires 'script'")?;
-            let json = ctx
-                .obscura
-                .eval_json(ctx.url, script, step.wait.unwrap_or(3))?;
+        Step::EvalJson { script, wait } => {
+            let json = ctx.obscura.eval_json(ctx.url, script, wait.unwrap_or(3))?;
             let vals: Vec<serde_json::Value> =
                 serde_json::from_str(&json).context("eval_json: expected JSON array")?;
             ps.elements = vals.iter().map(json_to_element).collect();
         }
-        Action::Find => {
-            let field = step.field.as_deref().context("find requires 'field'")?;
-            let value = step.value.as_deref().context("find requires 'value'")?;
+        Step::Find { field, op, value } => {
             let found = ps
                 .elements
                 .iter()
                 .find(|el| {
-                    el.get_field(field).is_some_and(|v| match &step.op {
+                    el.get_field(field).is_some_and(|v| match op {
                         Some(op) => eval_op(v, op, value),
-                        None => v == value,
+                        None => v == value.as_str(),
                     })
                 })
                 .cloned();
             ps.elements = found.into_iter().collect();
         }
-        Action::Filter => {
-            let field = step.field.as_deref().context("filter requires 'field'")?;
-            let op = step.op.as_ref().context("filter requires 'op'")?;
-            let value = step.value.as_deref().context("filter requires 'value'")?;
+        Step::Filter { field, op, value } => {
             ps.elements
                 .retain(|el| el.get_field(field).is_some_and(|v| eval_op(v, op, value)));
         }
-        Action::Set => {
-            let var = step.var.as_deref().context("set requires 'var'")?;
-            let value = step.value.as_deref().context("set requires 'value'")?;
-            ps.vars.insert(var.to_owned(), interpolate_env(value));
+        Step::Set { var, value } => {
+            ps.vars.insert(var.clone(), interpolate_env(value));
         }
-        Action::Map => {
-            let field = step.field.as_deref().context("map requires 'field'")?;
-            let var = step.var.as_deref().context("map requires 'var'")?;
+        Step::Map { field, var } => {
             let collected: Vec<String> = ps
                 .elements
                 .iter()
                 .filter_map(|el| el.get_field(field).map(str::to_owned))
                 .collect();
-            ps.vars.insert(var.to_owned(), collected.join(", "));
+            ps.vars.insert(var.clone(), collected.join(", "));
         }
-        Action::Alert => {
-            let message = step
-                .message
-                .as_deref()
-                .context("alert requires 'message'")?;
-            match step.on.clone().unwrap_or_default() {
-                AlertTrigger::Any => {
-                    if let Some(el) = ps.elements.first() {
-                        ps.alerts
-                            .push(interpolate_template(message, &element_vars(el, &ps.vars)));
-                    }
-                }
-                AlertTrigger::Each => {
-                    let alerts: Vec<String> = ps
-                        .elements
-                        .iter()
-                        .map(|el| interpolate_template(message, &element_vars(el, &ps.vars)))
-                        .collect();
-                    ps.alerts.extend(alerts);
-                }
-                AlertTrigger::Empty => {
-                    if ps.elements.is_empty() {
-                        ps.alerts.push(interpolate_template(message, &ps.vars));
-                    }
-                }
-                AlertTrigger::Change => {
-                    let field = step
-                        .field
-                        .as_deref()
-                        .context("alert on=change requires 'field'")?;
-                    if ps.elements.is_empty() {
-                        return Ok(());
-                    }
-                    let el = &ps.elements[0];
-                    let current = el.get_field(field).unwrap_or("").to_owned();
-                    let state_key = step.id.clone().unwrap_or_else(|| step_idx.to_string());
-                    let previous = read_state(ctx.scraper_name, &state_key)
-                        .or_else(|| step.default.clone())
-                        .unwrap_or_default();
-                    if current != previous {
-                        ps.alerts
-                            .push(interpolate_template(message, &element_vars(el, &ps.vars)));
-                        write_state(ctx.scraper_name, &state_key, &current);
-                    }
+        Step::Alert {
+            message,
+            on,
+            field,
+            default,
+            id,
+        } => match on {
+            AlertTrigger::Any => {
+                if let Some(el) = ps.elements.first() {
+                    ps.alerts
+                        .push(interpolate_template(message, &element_vars(el, &ps.vars)));
                 }
             }
-        }
-        Action::Log => {
+            AlertTrigger::Each => {
+                let alerts: Vec<String> = ps
+                    .elements
+                    .iter()
+                    .map(|el| interpolate_template(message, &element_vars(el, &ps.vars)))
+                    .collect();
+                ps.alerts.extend(alerts);
+            }
+            AlertTrigger::Empty => {
+                if ps.elements.is_empty() {
+                    ps.alerts.push(interpolate_template(message, &ps.vars));
+                }
+            }
+            AlertTrigger::Change => {
+                let field = field
+                    .as_deref()
+                    .context("alert on=change requires 'field'")?;
+                if ps.elements.is_empty() {
+                    return Ok(());
+                }
+                let el = &ps.elements[0];
+                let current = el.get_field(field).unwrap_or("").to_owned();
+                let state_key = id.clone().unwrap_or_else(|| step_idx.to_string());
+                let previous = read_state(ctx.scraper_name, &state_key)
+                    .or_else(|| default.clone())
+                    .unwrap_or_default();
+                if current != previous {
+                    ps.alerts
+                        .push(interpolate_template(message, &element_vars(el, &ps.vars)));
+                    write_state(ctx.scraper_name, &state_key, &current);
+                }
+            }
+        },
+        Step::Log => {
             println!("[pipeline:log] {} element(s)", ps.elements.len());
             for (i, el) in ps.elements.iter().enumerate() {
                 println!(
@@ -591,5 +570,40 @@ mod tests {
             &Op::Lt,
             "1500"
         ));
+    }
+
+    #[test]
+    fn steps_parse_into_typed_variants() {
+        let src = r#"
+name = "t"
+[[steps]]
+action = "query_all"
+selector = ".p"
+attrs = ["data-price"]
+
+[[steps]]
+action = "alert"
+message = "hi {data-price}"
+"#;
+        let def: ScraperDef = toml::from_str(src).unwrap();
+        assert_eq!(def.steps.len(), 2);
+        assert!(matches!(
+            &def.steps[0],
+            Step::QueryAll { selector, attrs, .. } if selector == ".p" && attrs == &["data-price"]
+        ));
+        assert!(matches!(
+            &def.steps[1],
+            Step::Alert {
+                on: AlertTrigger::Any,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn missing_required_field_is_parse_error() {
+        // query_all without a selector must fail at parse time, not at runtime.
+        let src = "name = \"t\"\n[[steps]]\naction = \"query_all\"\n";
+        assert!(toml::from_str::<ScraperDef>(src).is_err());
     }
 }
