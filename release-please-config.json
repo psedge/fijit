@@ -1,13 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "rust",
+  "versioning-strategy": "always-bump-patch",
   "packages": {
     "crates/fijit-cli": {
       "component": "fijit",
       "release-type": "rust",
       "changelog-path": "CHANGELOG.md",
-      "include-paths": ["crates/fijit-core", "crates/fijit-cli"],
-      "versioning-strategy": "always-bump-patch"
+      "include-paths": ["crates/fijit-core", "crates/fijit-cli"]
     }
   },
   "include-component-in-tag": false,
