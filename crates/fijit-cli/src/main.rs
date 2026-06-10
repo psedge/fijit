@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use fijit_core::{
     config::Config,
@@ -96,8 +96,22 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
     let binary = std::env::current_exe()?.to_string_lossy().into_owned();
     let cron_dir = std::env::current_dir()?.to_string_lossy().into_owned();
 
-    let log_dir = "/var/log/fijit".to_owned();
-    std::fs::create_dir_all(&log_dir)?;
+    let log_dir = "/var/log/fijit";
+    if let Err(e) = std::fs::create_dir_all(log_dir) {
+        anyhow::bail!(
+            "cannot create log directory {log_dir}: {e}\n\
+             Run: sudo mkdir -p {log_dir} && sudo chown $(whoami) {log_dir}"
+        );
+    }
+    // Verify the directory is actually writable before embedding the path.
+    let probe = std::path::Path::new(log_dir).join(".fijit-write-test");
+    std::fs::write(&probe, b"").with_context(|| {
+        format!(
+            "{log_dir} exists but is not writable by the current user.\n\
+             Run: sudo chown $(whoami) {log_dir}"
+        )
+    })?;
+    let _ = std::fs::remove_file(&probe);
     let log_path = format!("{log_dir}/{name}.log");
 
     let entry = format!("{cron}\tcd {cron_dir} && {binary} run {name} >> {log_path} 2>&1");
