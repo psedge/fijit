@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.2](https://github.com/psedge/fijit/compare/v0.4.1...v0.4.2) (2026-06-10)
+
+
+### Features
+
+* capture arbitrary element attributes via query_all attrs ([8700a31](https://github.com/psedge/fijit/commit/8700a31770cf16eae110cbba9df396f4e6f05a4a))
+
+
+### Bug Fixes
+
+* key change-alert state by explicit id, not step position ([df2cfc4](https://github.com/psedge/fijit/commit/df2cfc4a0b0707a30047f94a4594aea4606dc086))
+
 ## [0.4.1](https://github.com/psedge/fijit/compare/v0.4.0...v0.4.1) (2026-06-10)
 
 
