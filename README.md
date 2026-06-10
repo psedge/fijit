@@ -14,10 +14,10 @@ Scrapers live in `scrapers/*.toml`. Each file is a pipeline: a sequence of steps
 Fijit uses [Obscura](https://github.com/h4ckf0r0day/obscura), a stealth headless browser, to bypass Cloudflare and similar bot protection. Standard HTTP clients get a 403; Obscura does not.
 
 ```
-query_all -> find -> alert_if
-    |           |         |
- fetch &      narrow    emit Slack
- extract      target    if condition met
+query_all -> find -> alert
+    |          |        |
+ fetch &     narrow   emit Slack
+ extract     target   when triggered
 ```
 
 ---
@@ -28,13 +28,13 @@ Download the latest binary from [releases](https://github.com/psedge/fijit/relea
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-aarch64-apple-darwin.tar.gz | tar xz -C /usr/local/bin
 
 # macOS (Intel)
-curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-x86_64-apple-darwin.tar.gz | tar xz -C /usr/local/bin
 
 # Raspberry Pi (64-bit)
-curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-aarch64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/psedge/fijit/releases/latest/download/fijit-aarch64-unknown-linux-gnu.tar.gz | tar xz -C /usr/local/bin
 ```
 
 You will also need [Obscura](https://github.com/h4ckf0r0day/obscura/releases):

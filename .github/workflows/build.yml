@@ -63,8 +63,11 @@ jobs:
       - name: Package
         shell: bash
         run: |
+          # Unversioned asset name so the stable releases/latest/download/<name>
+          # URLs in the README keep working across releases. The version is
+          # conveyed by the release tag.
           TAG="${{ inputs.tag }}"
-          ASSET="${{ env.BINARY }}-${TAG}-${{ matrix.target }}.tar.gz"
+          ASSET="${{ env.BINARY }}-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" -C "target/${{ matrix.target }}/release" "${{ env.BINARY }}"
           echo "ASSET=$ASSET" >> $GITHUB_ENV
           echo "TAG=$TAG" >> $GITHUB_ENV
