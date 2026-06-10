@@ -38,6 +38,12 @@ pub struct Step {
     /// Trigger mode for `alert` (default: `"any"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on: Option<AlertTrigger>,
+    /// Stable identifier for the persisted state of an `alert` with `on = "change"`.
+    /// State is stored under this id, so it survives inserting or reordering other
+    /// steps. When omitted, state falls back to the step's position, which shifts
+    /// if the pipeline changes — set an `id` on change alerts to avoid spurious alerts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// The operation a pipeline step performs.

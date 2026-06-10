@@ -150,22 +150,22 @@ pub fn interpolate_env(s: &str) -> String {
     out
 }
 
-fn state_path(scraper_name: &str, step_idx: usize) -> std::path::PathBuf {
+fn state_path(scraper_name: &str, state_key: &str) -> std::path::PathBuf {
     let base = std::env::var("HOME")
         .map_or_else(|_| std::path::PathBuf::from("."), std::path::PathBuf::from);
     base.join(".local")
         .join("share")
         .join("fijit")
         .join("state")
-        .join(format!("{scraper_name}-{step_idx}"))
+        .join(format!("{scraper_name}-{state_key}"))
 }
 
-fn read_state(scraper_name: &str, step_idx: usize) -> Option<String> {
-    std::fs::read_to_string(state_path(scraper_name, step_idx)).ok()
+fn read_state(scraper_name: &str, state_key: &str) -> Option<String> {
+    std::fs::read_to_string(state_path(scraper_name, state_key)).ok()
 }
 
-fn write_state(scraper_name: &str, step_idx: usize, value: &str) {
-    let path = state_path(scraper_name, step_idx);
+fn write_state(scraper_name: &str, state_key: &str, value: &str) {
+    let path = state_path(scraper_name, state_key);
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -443,13 +443,14 @@ fn execute_step(
                     }
                     let el = &ps.elements[0];
                     let current = el.get_field(field).unwrap_or("").to_owned();
-                    let previous = read_state(ctx.scraper_name, step_idx)
+                    let state_key = step.id.clone().unwrap_or_else(|| step_idx.to_string());
+                    let previous = read_state(ctx.scraper_name, &state_key)
                         .or_else(|| step.default.clone())
                         .unwrap_or_default();
                     if current != previous {
                         ps.alerts
                             .push(interpolate_template(message, &element_vars(el, &ps.vars)));
-                        write_state(ctx.scraper_name, step_idx, &current);
+                        write_state(ctx.scraper_name, &state_key, &current);
                     }
                 }
             }
