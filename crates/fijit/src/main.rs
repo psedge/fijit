@@ -73,10 +73,6 @@ fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
     println!("[{}] checking…", scraper.name());
     match scraper.check() {
         Ok(ScrapeResult::NoChange) => println!("[{}] no change", scraper.name()),
-        Ok(ScrapeResult::Alert(msg)) => {
-            println!("[{}] ALERT: {}", scraper.name(), msg);
-            notify::slack_if_configured(webhook.as_deref(), &msg);
-        }
         Ok(ScrapeResult::Alerts(msgs)) => {
             for msg in &msgs {
                 println!("[{}] ALERT: {}", scraper.name(), msg);

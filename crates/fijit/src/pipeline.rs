@@ -325,10 +325,10 @@ fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
         execute_step(step, &ctx, &mut state, step_idx)?;
     }
 
-    Ok(match state.alerts.len() {
-        0 => ScrapeResult::NoChange,
-        1 => ScrapeResult::Alert(state.alerts.remove(0)),
-        _ => ScrapeResult::Alerts(state.alerts),
+    Ok(if state.alerts.is_empty() {
+        ScrapeResult::NoChange
+    } else {
+        ScrapeResult::Alerts(state.alerts)
     })
 }
 

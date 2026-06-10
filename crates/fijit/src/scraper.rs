@@ -2,9 +2,7 @@
 pub enum ScrapeResult {
     /// Nothing worth notifying about.
     NoChange,
-    /// Something the user should know — send this to Slack.
-    Alert(String),
-    /// Multiple independent alerts (e.g. several items changed).
+    /// One or more alerts to send to Slack, one Slack message per entry.
     Alerts(Vec<String>),
 }
 
