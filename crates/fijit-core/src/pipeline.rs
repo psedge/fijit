@@ -199,6 +199,45 @@ pub fn interpolate_template<S: std::hash::BuildHasher>(
     out
 }
 
+/// Extract the first number from `s`, ignoring currency symbols, surrounding
+/// text, and thousands separators (commas). For example `"£1,299.00 incl. VAT"`
+/// parses to `1299.0`. Returns `None` if no digit is present.
+fn parse_number(s: &str) -> Option<f64> {
+    let mut num = String::new();
+    let mut seen_digit = false;
+    let mut seen_dot = false;
+    for c in s.chars() {
+        match c {
+            '0'..='9' => {
+                num.push(c);
+                seen_digit = true;
+            }
+            '.' if seen_digit && !seen_dot => {
+                num.push(c);
+                seen_dot = true;
+            }
+            ',' if seen_digit => {} // thousands separator
+            '-' if num.is_empty() => num.push(c),
+            _ => {
+                if seen_digit {
+                    break;
+                }
+                num.clear();
+            }
+        }
+    }
+    if seen_digit {
+        num.parse::<f64>().ok()
+    } else {
+        None
+    }
+}
+
+/// Compare `field_val` and `value` numerically. No match if either is non-numeric.
+fn num_cmp(field_val: &str, value: &str, f: impl Fn(f64, f64) -> bool) -> bool {
+    matches!((parse_number(field_val), parse_number(value)), (Some(a), Some(b)) if f(a, b))
+}
+
 fn eval_op(field_val: &str, op: &Op, value: &str) -> bool {
     match op {
         Op::Eq => field_val == value,
@@ -208,6 +247,10 @@ fn eval_op(field_val: &str, op: &Op, value: &str) -> bool {
         Op::Matches => regex::Regex::new(value).is_ok_and(|re| re.is_match(field_val)),
         Op::StartsWith => field_val.starts_with(value),
         Op::EndsWith => field_val.ends_with(value),
+        Op::Gt => num_cmp(field_val, value, |a, b| a > b),
+        Op::Lt => num_cmp(field_val, value, |a, b| a < b),
+        Op::Gte => num_cmp(field_val, value, |a, b| a >= b),
+        Op::Lte => num_cmp(field_val, value, |a, b| a <= b),
     }
 }
 
@@ -468,6 +511,26 @@ mod tests {
     fn eval_op_matches_regex() {
         assert!(eval_op("--stock-1 active", &Op::Matches, r"--stock-\d"));
         assert!(!eval_op("--stock-4 active", &Op::Matches, r"--stock-1$"));
+    }
+
+    #[test]
+    fn parse_number_extracts_from_noisy_strings() {
+        assert_eq!(parse_number("£1,299.00 incl. VAT"), Some(1299.0));
+        assert_eq!(parse_number("$42.99"), Some(42.99));
+        assert_eq!(parse_number("12 in stock"), Some(12.0));
+        assert_eq!(parse_number("-5°C"), Some(-5.0));
+        assert_eq!(parse_number("sold out"), None);
+    }
+
+    #[test]
+    fn eval_op_numeric_comparisons() {
+        assert!(eval_op("£1,299.00", &Op::Lt, "1500"));
+        assert!(eval_op("£1,299.00", &Op::Gt, "1000"));
+        assert!(eval_op("42", &Op::Gte, "42"));
+        assert!(eval_op("42", &Op::Lte, "42"));
+        assert!(!eval_op("42", &Op::Gt, "42"));
+        // Non-numeric field never matches a numeric op.
+        assert!(!eval_op("sold out", &Op::Lt, "100"));
     }
 
     #[test]

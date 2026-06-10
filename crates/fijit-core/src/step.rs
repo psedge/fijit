@@ -100,4 +100,14 @@ pub enum Op {
     StartsWith,
     /// Field ends with value.
     EndsWith,
+    /// Field, parsed as a number, is greater than value. Useful for price/stock
+    /// thresholds. Currency symbols and thousands separators are ignored, so
+    /// `"£1,299.00"` compares as `1299.0`. No match if either side isn't numeric.
+    Gt,
+    /// Field, parsed as a number, is less than value.
+    Lt,
+    /// Field, parsed as a number, is greater than or equal to value.
+    Gte,
+    /// Field, parsed as a number, is less than or equal to value.
+    Lte,
 }

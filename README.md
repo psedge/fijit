@@ -161,6 +161,14 @@ Optional on `query_all` and `eval_json`: `wait` (seconds to pause after page loa
 | `starts_with` | Field starts with value |
 | `ends_with` | Field ends with value |
 | `matches` | Field matches value as a regular expression |
+| `gt` | Field, parsed as a number, is greater than value |
+| `lt` | Field, parsed as a number, is less than value |
+| `gte` | Field, parsed as a number, is greater than or equal to value |
+| `lte` | Field, parsed as a number, is less than or equal to value |
+
+Numeric ops ignore currency symbols and thousands separators, so a scraped
+price like `£1,299.00` compares as `1299.0`. They don't match if either side
+isn't a number (e.g. `"sold out"`).
 
 ---
 
