@@ -34,4 +34,11 @@ pub trait Scraper: Send + Sync {
     fn schedule(&self) -> Option<&str> {
         None
     }
+
+    /// Message template to send to Slack when the scraper returns an error.
+    /// Supports `{name}` and `{error}` placeholders.
+    /// Return `None` to log errors silently (default).
+    fn on_error_message(&self) -> Option<&str> {
+        None
+    }
 }

@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use fijit_core::{
     config::Config,
     notify,
-    pipeline::load_scraper_files,
+    pipeline::{interpolate_template, load_scraper_files},
     scraper::{ScrapeResult, Scraper},
 };
 
@@ -65,17 +65,28 @@ fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
         .or_else(|| config.slack_webhook.clone());
 
     println!("[{}] checking…", scraper.name());
-    match scraper.check()? {
-        ScrapeResult::NoChange => println!("[{}] no change", scraper.name()),
-        ScrapeResult::Alert(msg) => {
+    match scraper.check() {
+        Ok(ScrapeResult::NoChange) => println!("[{}] no change", scraper.name()),
+        Ok(ScrapeResult::Alert(msg)) => {
             println!("[{}] ALERT: {}", scraper.name(), msg);
             notify::slack_if_configured(webhook.as_deref(), &msg);
         }
-        ScrapeResult::Alerts(msgs) => {
+        Ok(ScrapeResult::Alerts(msgs)) => {
             for msg in &msgs {
                 println!("[{}] ALERT: {}", scraper.name(), msg);
                 notify::slack_if_configured(webhook.as_deref(), msg);
             }
+        }
+        Err(e) => {
+            eprintln!("[{}] ERROR: {e}", scraper.name());
+            if let Some(tmpl) = scraper.on_error_message() {
+                let mut vars = std::collections::HashMap::new();
+                vars.insert("name".to_owned(), scraper.name().to_owned());
+                vars.insert("error".to_owned(), e.to_string());
+                let msg = interpolate_template(tmpl, &vars);
+                notify::slack_if_configured(webhook.as_deref(), &msg);
+            }
+            return Err(e);
         }
     }
     Ok(())

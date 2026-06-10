@@ -96,6 +96,9 @@ url         = "https://example.com/product-page"
 schedule    = "*/30 * * * *"
 slack_webhook = "${SLACK_WEBHOOK}"   # overrides global; omit to use global
 
+[on_error]
+message = "⚠️ *{name} scraper failed*: {error}"
+
 [[steps]]
 action   = "query_all"
 selector = ".stock-status"
@@ -173,6 +176,13 @@ Alert messages support `{var}` placeholders:
 | `{href}` | `href` of the matched element |
 | `{value}` | `value` of the matched element |
 | `{MY_VAR}` | Any key from `[vars]` in `fijit.toml` or stored by `set`/`map` |
+
+In `[on_error]` messages only:
+
+| Variable | Source |
+|---|---|
+| `{name}` | Scraper name |
+| `{error}` | Error message |
 
 ---
 

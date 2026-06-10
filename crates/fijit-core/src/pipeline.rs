@@ -8,6 +8,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Error handler for a scraper — sent to Slack when `check()` returns an error.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OnError {
+    /// Slack message template. Supports `{name}` and `{error}` placeholders.
+    pub message: String,
+}
+
 /// A scraper definition loaded from a TOML file in the `scrapers/` directory.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ScraperDef {
@@ -29,6 +36,9 @@ pub struct ScraperDef {
     /// Ordered list of pipeline steps.
     #[serde(default)]
     pub steps: Vec<Step>,
+    /// Optional error handler — notifies Slack when the pipeline returns an error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_error: Option<OnError>,
 }
 
 /// A config-file-driven scraper that executes a declarative pipeline.
@@ -84,6 +94,10 @@ impl Scraper for ConfigScraper {
 
     fn schedule(&self) -> Option<&str> {
         self.def.schedule.as_deref()
+    }
+
+    fn on_error_message(&self) -> Option<&str> {
+        self.def.on_error.as_ref().map(|e| e.message.as_str())
     }
 }
 
@@ -160,7 +174,12 @@ fn write_state(scraper_name: &str, step_idx: usize, value: &str) {
     }
 }
 
-fn interpolate_template(s: &str, vars: &HashMap<String, String>) -> String {
+/// Expand `{key}` placeholders in `s` using `vars`. Unknown keys are left as-is.
+#[must_use]
+pub fn interpolate_template<S: std::hash::BuildHasher>(
+    s: &str,
+    vars: &HashMap<String, String, S>,
+) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
