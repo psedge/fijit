@@ -16,7 +16,7 @@ pub struct Step {
     /// Element field to inspect (`"text"`, `"class"`, `"href"`, `"value"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
-    /// Comparison operator (required by `filter`, `alert_if`, `alert_if_any`).
+    /// Comparison operator (required by `filter`; optional on `find`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub op: Option<Op>,
     /// The value to compare against, or a literal value for `set`.
@@ -25,13 +25,19 @@ pub struct Step {
     /// Variable name to write to (used by `set` and `map`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub var: Option<String>,
-    /// Slack message template (required by `alert_*` actions).
+    /// Slack message template (required by `alert`).
     /// Supports `{url}`, `{text}`, `{class}`, `{href}`, `{value}`, and custom `[vars]`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     /// Seconds to wait after page load before evaluating (default: 3).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wait: Option<u64>,
+    /// Assumed initial value for `alert` with `on = "change"` when no prior state exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+    /// Trigger mode for `alert` (default: `"any"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on: Option<AlertTrigger>,
 }
 
 /// The operation a pipeline step performs.
@@ -44,7 +50,7 @@ pub enum Action {
     /// Fetch the scraper URL, evaluate a JS `script`, and parse the JSON result.
     /// Replaces the current element list with the parsed elements.
     EvalJson,
-    /// Keep only the first element whose `field` equals `value`.
+    /// Keep only the first element whose `field` matches `value` (optionally via `op`).
     Find,
     /// Keep all elements whose `field` satisfies `op` against `value`.
     Filter,
@@ -52,14 +58,28 @@ pub enum Action {
     Set,
     /// Collect `field` from all elements and join them into a named `var`.
     Map,
-    /// Emit an alert if the first matching element's `field` satisfies `op` against `value`.
-    AlertIf,
-    /// Emit an alert if the current element list is empty.
-    AlertIfEmpty,
-    /// Emit one alert per element whose `field` satisfies `op` against `value`.
-    AlertIfAny,
+    /// Emit a Slack alert. Trigger behaviour is controlled by `on` (default: `"any"`).
+    Alert,
     /// Print the current element list to stdout.
     Log,
+}
+
+/// Controls when an `alert` step fires.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertTrigger {
+    /// Fire once when the element list is non-empty. Uses the first element's fields
+    /// for template interpolation. This is the default.
+    #[default]
+    Any,
+    /// Fire one alert per element.
+    Each,
+    /// Fire when the element list is empty.
+    Empty,
+    /// Fire when `field` of the first element changes from its previous value.
+    /// State is persisted between runs. Use `default` to set the assumed initial value.
+    /// No-op when the element list is empty.
+    Change,
 }
 
 /// A binary comparison operator.

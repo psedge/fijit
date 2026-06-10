@@ -101,20 +101,23 @@ action   = "query_all"
 selector = ".stock-status"
 
 [[steps]]
-action = "find"
+action = "filter"
 field  = "text"
 op     = "starts_with"
 value  = "Target item"
 
 [[steps]]
-action  = "alert_if"
-field   = "class"
-op      = "contains"
-value   = "in-stock"
+action = "filter"
+field  = "class"
+op     = "contains"
+value  = "in-stock"
+
+[[steps]]
+action  = "alert"
 message = "Target item is available: {url}"
 ```
 
-The pipeline state is a list of `Element` objects. Each step reads from and writes back to that list. Alert steps emit Slack messages without modifying the list.
+The pipeline state is a list of `Element` objects. Each step reads from and writes back to that list. `alert` emits Slack messages without modifying the list.
 
 ---
 
@@ -128,12 +131,19 @@ The pipeline state is a list of `Element` objects. Each step reads from and writ
 | `filter` | Keep all elements where `field op value` is true. | `field`, `op`, `value` |
 | `set` | Store a literal `value` into a named `var`. | `var`, `value` |
 | `map` | Collect `field` from all elements into a named `var` (comma-joined). | `field`, `var` |
-| `alert_if` | Emit one alert if the first matching element satisfies `field op value`. | `field`, `op`, `value`, `message` |
-| `alert_if_empty` | Emit an alert when the element list is empty. | `message` |
-| `alert_if_any` | Emit one alert per element satisfying `field op value`. | `field`, `op`, `value`, `message` |
-| `log` | Print current element list to stdout. | - |
+| `alert` | Emit a Slack alert. Trigger behaviour controlled by `on` (default: `any`). | `message` |
+| `log` | Print the current element list to stdout. | - |
 
 Optional on `query_all` and `eval_json`: `wait` (seconds to pause after page load, default `3`).
+
+### Alert triggers (`on`)
+
+| Value | Behaviour |
+|---|---|
+| `any` (default) | Fire once when the element list is non-empty. Uses the first element's fields for template interpolation. |
+| `each` | Fire one alert per element. |
+| `empty` | Fire when the element list is empty. |
+| `change` | Fire when `field` of the first element changes from its previous value. State is persisted between runs. Use `default` to set the assumed initial value. No-op when the element list is empty. |
 
 ---
 

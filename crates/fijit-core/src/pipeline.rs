@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::element::Element;
 use crate::obscura::ObscuraRunner;
 use crate::scraper::{ScrapeResult, Scraper};
-use crate::step::{Action, Op, Step};
+use crate::step::{Action, AlertTrigger, Op, Step};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -136,6 +136,30 @@ pub fn interpolate_env(s: &str) -> String {
     out
 }
 
+fn state_path(scraper_name: &str, step_idx: usize) -> std::path::PathBuf {
+    let base = std::env::var("HOME")
+        .map_or_else(|_| std::path::PathBuf::from("."), std::path::PathBuf::from);
+    base.join(".local")
+        .join("share")
+        .join("fijit")
+        .join("state")
+        .join(format!("{scraper_name}-{step_idx}"))
+}
+
+fn read_state(scraper_name: &str, step_idx: usize) -> Option<String> {
+    std::fs::read_to_string(state_path(scraper_name, step_idx)).ok()
+}
+
+fn write_state(scraper_name: &str, step_idx: usize, value: &str) {
+    let path = state_path(scraper_name, step_idx);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(&path, value) {
+        eprintln!("warn: could not write state to {}: {e}", path.display());
+    }
+}
+
 fn interpolate_template(s: &str, vars: &HashMap<String, String>) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -209,6 +233,7 @@ fn element_vars(el: &Element, base: &HashMap<String, String>) -> HashMap<String,
 struct PipelineCtx<'a> {
     obscura: &'a ObscuraRunner,
     url: &'a str,
+    scraper_name: &'a str,
 }
 
 struct PipelineState {
@@ -226,6 +251,7 @@ fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
     let ctx = PipelineCtx {
         obscura: &obscura,
         url: &url,
+        scraper_name: &def.name,
     };
     let mut state = PipelineState {
         elements: Vec::new(),
@@ -233,8 +259,8 @@ fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
         alerts: Vec::new(),
     };
 
-    for step in &def.steps {
-        execute_step(step, &ctx, &mut state)?;
+    for (step_idx, step) in def.steps.iter().enumerate() {
+        execute_step(step, &ctx, &mut state, step_idx)?;
     }
 
     Ok(match state.alerts.len() {
@@ -245,7 +271,12 @@ fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> Result<()> {
+fn execute_step(
+    step: &Step,
+    ctx: &PipelineCtx<'_>,
+    ps: &mut PipelineState,
+    step_idx: usize,
+) -> Result<()> {
     match step.action {
         Action::QueryAll => {
             let selector = step
@@ -315,54 +346,51 @@ fn execute_step(step: &Step, ctx: &PipelineCtx<'_>, ps: &mut PipelineState) -> R
                 .collect();
             ps.vars.insert(var.to_owned(), collected.join(", "));
         }
-        Action::AlertIf => {
-            let field = step.field.as_deref().context("alert_if requires 'field'")?;
-            let op = step.op.as_ref().context("alert_if requires 'op'")?;
-            let value = step.value.as_deref().context("alert_if requires 'value'")?;
-            let message = step
-                .message
-                .as_deref()
-                .context("alert_if requires 'message'")?;
-            if let Some(el) = ps
-                .elements
-                .iter()
-                .find(|el| el.get_field(field).is_some_and(|v| eval_op(v, op, value)))
-            {
-                ps.alerts
-                    .push(interpolate_template(message, &element_vars(el, &ps.vars)));
-            }
-        }
-        Action::AlertIfEmpty => {
-            let message = step
-                .message
-                .as_deref()
-                .context("alert_if_empty requires 'message'")?;
-            if ps.elements.is_empty() {
-                ps.alerts.push(interpolate_template(message, &ps.vars));
-            }
-        }
-        Action::AlertIfAny => {
-            let field = step
-                .field
-                .as_deref()
-                .context("alert_if_any requires 'field'")?;
-            let op = step.op.as_ref().context("alert_if_any requires 'op'")?;
-            let value = step
-                .value
-                .as_deref()
-                .context("alert_if_any requires 'value'")?;
-            let message = step
-                .message
-                .as_deref()
-                .context("alert_if_any requires 'message'")?;
-            let matches: Vec<HashMap<String, String>> = ps
-                .elements
-                .iter()
-                .filter(|el| el.get_field(field).is_some_and(|v| eval_op(v, op, value)))
-                .map(|el| element_vars(el, &ps.vars))
-                .collect();
-            for ev in matches {
-                ps.alerts.push(interpolate_template(message, &ev));
+        Action::Alert => {
+            let message = step.message.as_deref().context("alert requires 'message'")?;
+            match step.on.clone().unwrap_or_default() {
+                AlertTrigger::Any => {
+                    if let Some(el) = ps.elements.first() {
+                        ps.alerts.push(interpolate_template(
+                            message,
+                            &element_vars(el, &ps.vars),
+                        ));
+                    }
+                }
+                AlertTrigger::Each => {
+                    let alerts: Vec<String> = ps
+                        .elements
+                        .iter()
+                        .map(|el| interpolate_template(message, &element_vars(el, &ps.vars)))
+                        .collect();
+                    ps.alerts.extend(alerts);
+                }
+                AlertTrigger::Empty => {
+                    if ps.elements.is_empty() {
+                        ps.alerts.push(interpolate_template(message, &ps.vars));
+                    }
+                }
+                AlertTrigger::Change => {
+                    let field = step
+                        .field
+                        .as_deref()
+                        .context("alert on=change requires 'field'")?;
+                    if ps.elements.is_empty() {
+                        return Ok(());
+                    }
+                    let el = &ps.elements[0];
+                    let current = el.get_field(field).unwrap_or("").to_owned();
+                    let previous = read_state(ctx.scraper_name, step_idx)
+                        .or_else(|| step.default.clone())
+                        .unwrap_or_default();
+                    if current != previous {
+                        ps.alerts.push(interpolate_template(
+                            message,
+                            &element_vars(el, &ps.vars),
+                        ));
+                        write_state(ctx.scraper_name, step_idx, &current);
+                    }
+                }
             }
         }
         Action::Log => {
