@@ -255,6 +255,18 @@ fn eval_op(field_val: &str, op: &Op, value: &str) -> bool {
 }
 
 fn json_to_element(val: &serde_json::Value) -> Element {
+    let attrs = val["attrs"]
+        .as_object()
+        .map(|m| {
+            m.iter()
+                .filter_map(|(k, v)| {
+                    v.as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| (k.clone(), s.to_owned()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     Element {
         text: val["text"]
             .as_str()
@@ -272,6 +284,7 @@ fn json_to_element(val: &serde_json::Value) -> Element {
             .as_str()
             .filter(|s| !s.is_empty())
             .map(str::to_owned),
+        attrs,
     }
 }
 
@@ -288,6 +301,9 @@ fn element_vars(el: &Element, base: &HashMap<String, String>) -> HashMap<String,
     }
     if let Some(v) = &el.value {
         m.insert("value".to_owned(), v.clone());
+    }
+    for (k, v) in &el.attrs {
+        m.insert(k.clone(), v.clone());
     }
     m
 }
@@ -347,10 +363,22 @@ fn execute_step(
                 .context("query_all requires 'selector'")?;
             let selector = interpolate_env(selector);
             let selector_js = serde_json::to_string(&selector).unwrap_or_default();
+            let attrs_js = step
+                .attrs
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(|a| {
+                    let key = serde_json::to_string(a).unwrap_or_default();
+                    format!("{key}: el.getAttribute({key})")
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             let script = format!(
                 "JSON.stringify(Array.from(document.querySelectorAll({selector_js})).map(el => \
                  ({{text: el.textContent.replace(/\\s+/g,' ').trim(), class: el.className, \
-                   href: el.getAttribute('href'), value: el.getAttribute('value')}})))"
+                   href: el.getAttribute('href'), value: el.getAttribute('value'), \
+                   attrs: {{{attrs_js}}}}})))"
             );
             let json = ctx
                 .obscura
@@ -542,5 +570,26 @@ mod tests {
         assert_eq!(el.class.as_deref(), Some("item --stock-1"));
         assert!(el.href.is_none());
         assert!(el.value.is_none());
+        assert!(el.attrs.is_empty());
+    }
+
+    #[test]
+    fn json_to_element_captures_extra_attrs() {
+        let v = serde_json::json!({
+            "text": "Bike",
+            "attrs": {"data-price": "£1,299.00", "aria-label": "", "data-sku": "ABC"}
+        });
+        let el = json_to_element(&v);
+        // Empty attribute values are dropped, non-empty ones are addressable by name.
+        assert_eq!(el.get_field("data-price"), Some("£1,299.00"));
+        assert_eq!(el.get_field("data-sku"), Some("ABC"));
+        assert_eq!(el.get_field("aria-label"), None);
+        assert_eq!(el.get_field("text"), Some("Bike"));
+        // A custom attr is usable by a numeric op (e.g. price thresholds).
+        assert!(eval_op(
+            el.get_field("data-price").unwrap(),
+            &Op::Lt,
+            "1500"
+        ));
     }
 }

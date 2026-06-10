@@ -10,10 +10,17 @@ pub struct Step {
     /// CSS selector (required by `query_all`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selector: Option<String>,
+    /// Extra HTML attributes for `query_all` to capture beyond the built-in
+    /// `text`/`class`/`href`/`value`, e.g. `["data-price", "aria-label"]`. Each
+    /// becomes addressable by `field` (in `filter`/`find`) and as a `{name}`
+    /// template variable in `alert` messages.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attrs: Option<Vec<String>>,
     /// JavaScript expression (required by `eval_json`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub script: Option<String>,
-    /// Element field to inspect (`"text"`, `"class"`, `"href"`, `"value"`).
+    /// Element field to inspect: a built-in (`"text"`, `"class"`, `"href"`,
+    /// `"value"`) or any attribute captured via `query_all`'s `attrs`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
     /// Comparison operator (required by `filter`; optional on `find`).

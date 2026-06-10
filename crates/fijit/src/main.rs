@@ -188,6 +188,8 @@ const INIT_CONFIG_TEMPLATE: &str = "\
 #           fijit list                show all scrapers
 #
 # Pipeline actions: query_all, eval_json, filter, find, set, map, alert, log
+# Element fields:   text, class, href, value — plus any in query_all's `attrs`
+#                   list, e.g. attrs = [\"data-price\", \"aria-label\"]
 # Filter/find ops:  eq, not_eq, contains, not_contains, starts_with, ends_with,
 #                   matches (regex), gt, lt, gte, lte (numeric, e.g. price < 100)
 # Alert triggers:   on = \"any\" | \"each\" | \"empty\" | \"change\"

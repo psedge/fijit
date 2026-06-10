@@ -122,6 +122,25 @@ message = "Target item is available: {url}"
 
 The pipeline state is a list of `Element` objects. Each step reads from and writes back to that list. `alert` emits Slack messages without modifying the list.
 
+Every element exposes the built-in fields `text`, `class`, `href`, and `value`. To capture other attributes (e.g. `data-price`, `aria-label`), list them in `attrs` on the `query_all` step — each then works anywhere a `field` is used and as a `{name}` template variable:
+
+```toml
+[[steps]]
+action = "query_all"
+selector = ".product"
+attrs  = ["data-price", "data-sku"]
+
+[[steps]]
+action = "filter"
+field  = "data-price"   # a captured attribute
+op     = "lt"
+value  = "100"
+
+[[steps]]
+action  = "alert"
+message = "{data-sku} dropped to {data-price}: {url}"
+```
+
 ---
 
 ## Action reference
@@ -137,7 +156,7 @@ The pipeline state is a list of `Element` objects. Each step reads from and writ
 | `alert` | Emit a Slack alert. Trigger behaviour controlled by `on` (default: `any`). | `message` |
 | `log` | Print the current element list to stdout. | - |
 
-Optional on `query_all` and `eval_json`: `wait` (seconds to pause after page load, default `3`).
+Optional on `query_all`: `attrs` (extra HTML attributes to capture beyond the built-ins). Optional on `query_all` and `eval_json`: `wait` (seconds to pause after page load, default `3`).
 
 ### Alert triggers (`on`)
 
