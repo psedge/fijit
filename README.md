@@ -190,7 +190,7 @@ fijit init-config                            # print an example fijit.toml
 
 ## Scheduling
 
-`fijit schedule` writes an entry to the user's crontab. Run it from the directory that contains `fijit.toml` — the entry records the working directory and uses the absolute path to the binary, so it works correctly when cron runs it later.
+`fijit schedule` writes an entry to the user's crontab. Run it from the directory that contains `fijit.toml` — the entry records the working directory and uses the absolute path to the binary, so it works correctly when cron runs it later. Output is logged to `~/.local/share/fijit/logs/<name>.log` automatically.
 
 Common cron expressions:
 

@@ -95,7 +95,15 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
 
     let binary = std::env::current_exe()?.to_string_lossy().into_owned();
     let cron_dir = std::env::current_dir()?.to_string_lossy().into_owned();
-    let entry = format!("{cron}\tcd {cron_dir} && {binary} run {name}");
+
+    let log_dir = std::env::var("HOME").map_or_else(
+        |_| format!("{cron_dir}/.fijit/logs"),
+        |h| format!("{h}/.local/share/fijit/logs"),
+    );
+    std::fs::create_dir_all(&log_dir)?;
+    let log_path = format!("{log_dir}/{name}.log");
+
+    let entry = format!("{cron}\tcd {cron_dir} && {binary} run {name} >> {log_path} 2>&1");
     let tag = format!("# fijit:{name}");
 
     let existing = read_crontab()?;
@@ -108,6 +116,7 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
     write_crontab(&new_crontab)?;
 
     println!("Scheduled '{name}' with cron: {cron}");
+    println!("Log: {log_path}");
     println!("Entry: {entry}");
     Ok(())
 }
