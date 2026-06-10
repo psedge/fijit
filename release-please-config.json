@@ -6,7 +6,8 @@
       "component": "fijit",
       "release-type": "rust",
       "changelog-path": "CHANGELOG.md",
-      "include-paths": ["crates/fijit-core", "crates/fijit-cli"]
+      "include-paths": ["crates/fijit-core", "crates/fijit-cli"],
+      "versioning-strategy": "always-bump-patch"
     }
   },
   "include-component-in-tag": false,
