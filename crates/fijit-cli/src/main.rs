@@ -96,10 +96,7 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
     let binary = std::env::current_exe()?.to_string_lossy().into_owned();
     let cron_dir = std::env::current_dir()?.to_string_lossy().into_owned();
 
-    let log_dir = std::env::var("HOME").map_or_else(
-        |_| format!("{cron_dir}/.fijit/logs"),
-        |h| format!("{h}/.local/share/fijit/logs"),
-    );
+    let log_dir = "/var/log/fijit".to_owned();
     std::fs::create_dir_all(&log_dir)?;
     let log_path = format!("{log_dir}/{name}.log");
 
