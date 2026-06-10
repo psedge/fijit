@@ -347,14 +347,15 @@ fn execute_step(
             ps.vars.insert(var.to_owned(), collected.join(", "));
         }
         Action::Alert => {
-            let message = step.message.as_deref().context("alert requires 'message'")?;
+            let message = step
+                .message
+                .as_deref()
+                .context("alert requires 'message'")?;
             match step.on.clone().unwrap_or_default() {
                 AlertTrigger::Any => {
                     if let Some(el) = ps.elements.first() {
-                        ps.alerts.push(interpolate_template(
-                            message,
-                            &element_vars(el, &ps.vars),
-                        ));
+                        ps.alerts
+                            .push(interpolate_template(message, &element_vars(el, &ps.vars)));
                     }
                 }
                 AlertTrigger::Each => {
@@ -384,10 +385,8 @@ fn execute_step(
                         .or_else(|| step.default.clone())
                         .unwrap_or_default();
                     if current != previous {
-                        ps.alerts.push(interpolate_template(
-                            message,
-                            &element_vars(el, &ps.vars),
-                        ));
+                        ps.alerts
+                            .push(interpolate_template(message, &element_vars(el, &ps.vars)));
                         write_state(ctx.scraper_name, step_idx, &current);
                     }
                 }
