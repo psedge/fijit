@@ -50,15 +50,11 @@ curl -L https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-
 ## Quick start
 
 ```bash
-# 1. generate a config file
-fijit init-config > fijit.toml
-
-# 2. edit fijit.toml with your Obscura path and Slack webhook
-# 3. create a scraper in scrapers/my-scraper.toml
-# 4. run it
+# 1. create a scraper in scrapers/my-scraper.toml (see below)
+# 2. run it (Obscura is taken from $PATH, or pass --obscura <path>)
 fijit run my-scraper
 
-# 5. schedule it
+# 3. schedule it
 fijit schedule my-scraper --cron "*/30 * * * *"
 ```
 
@@ -66,22 +62,15 @@ fijit schedule my-scraper --cron "*/30 * * * *"
 
 ## Configuration
 
-Fijit looks for `./fijit.toml` first, then `~/.config/fijit/config.toml`.
+There is no global config file. Each scraper is self-contained.
 
-```toml
-obscura_path = "/usr/local/bin/obscura"
-slack_webhook = "https://hooks.slack.com/services/..."
+Obscura is resolved from the `obscura` binary on `$PATH`, or from an explicit
+`--obscura <path>` flag (which works before any subcommand). If neither is
+available, the command exits with an error. `fijit schedule` records the
+resolved path in the crontab entry, so scheduled runs do not depend on `$PATH`.
 
-[vars]
-# Custom variables available as {MY_VAR} in alert messages
-MY_VAR = "value"
-```
-
-Config values support `${ENV_VAR}` interpolation:
-
-```toml
-slack_webhook = "${SLACK_WEBHOOK}"
-```
+Everything else lives in the scraper file: its Slack webhook, its template
+variables, and (after the first run) its persisted alert state.
 
 ---
 
@@ -94,7 +83,11 @@ name        = "my-scraper"
 description = "Watches something for changes"
 url         = "https://example.com/product-page"
 schedule    = "*/30 * * * *"
-slack_webhook = "${SLACK_WEBHOOK}"   # overrides global; omit to use global
+slack_webhook = "${SLACK_WEBHOOK}"   # this scraper's webhook (supports ${ENV_VAR})
+
+# Optional template variables, available as {MY_VAR} in messages below.
+[vars]
+MY_VAR = "value"
 
 [on_error]
 message = "⚠️ *{name} scraper failed*: {error}"
@@ -273,7 +266,7 @@ Alert messages support `{var}` placeholders:
 | `{class}` | `class` of the matched element |
 | `{href}` | `href` of the matched element |
 | `{value}` | `value` of the matched element |
-| `{MY_VAR}` | Any key from `[vars]` in `fijit.toml` or stored by `set`/`map` |
+| `{MY_VAR}` | Any key from the scraper's `[vars]`, or stored by `set`/`map` |
 
 In `[on_error]` messages only:
 
@@ -289,16 +282,15 @@ In `[on_error]` messages only:
 ```
 fijit list                                   # show all scrapers
 fijit run <name>                             # run once
-fijit test-notify                            # send a test Slack message
+fijit run <name> --obscura /path/to/obscura  # override the Obscura binary
 fijit schedule <name>                        # add to crontab (default: */30 * * * *)
 fijit schedule <name> --cron "0 9 * * *"    # daily at 9am
 fijit unschedule <name>                      # remove from crontab
-fijit init-config                            # print an example fijit.toml
 ```
 
 ## Scheduling
 
-`fijit schedule` writes an entry to the user's crontab. Run it from the directory that contains `fijit.toml`. The entry records the working directory and uses the absolute path to the binary, so it works correctly when cron runs it later. Output is logged to `/var/log/fijit/<name>.log`. Create the directory once before scheduling:
+`fijit schedule` writes an entry to the user's crontab. Run it from the directory that holds your `scrapers/` folder. The entry records the working directory, the absolute path to the binary, and the resolved Obscura path, so it works correctly when cron runs it later. Output is logged to `/var/log/fijit/<name>.log`. Create the directory once before scheduling:
 
 ```bash
 sudo mkdir -p /var/log/fijit && sudo chown $(whoami) /var/log/fijit
