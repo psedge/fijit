@@ -72,6 +72,46 @@ pub enum Step {
         /// Variable name to write the comma-joined result to.
         var: String,
     },
+    /// Reorder the element list by `field`. Stable; ties keep their input order.
+    Sort {
+        /// Element field to sort by (a built-in or a captured attribute).
+        field: String,
+        /// Sort direction (default: `"asc"`).
+        #[serde(default, skip_serializing_if = "SortOrder::is_default")]
+        order: SortOrder,
+        /// Compare values numerically via the same parser as the numeric ops
+        /// (currency symbols and thousands separators ignored). Non-numeric
+        /// values sort after numeric ones. Default: lexical comparison.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        numeric: bool,
+    },
+    /// Derive a new per-element `field` from a `template`, evaluated against each
+    /// element's fields and the current vars. Adds (or overwrites) that field on
+    /// every element — useful for building readable labels or stable fingerprints.
+    Compute {
+        /// Name of the field to write on each element.
+        field: String,
+        /// Template string, e.g. `"{text} @ {value}"`. Supports the same
+        /// `{name}` placeholders as alert messages.
+        template: String,
+    },
+    /// For each element, fetch the URL in `field` and extract elements matching
+    /// `selector` on that page. The element list is replaced by the flattened
+    /// matches across every followed page — one bounded level of link-walking.
+    Follow {
+        /// Element field holding the link to follow (default: `"href"`).
+        /// Relative links are resolved against the scraper URL.
+        #[serde(default = "default_link_field")]
+        field: String,
+        /// CSS selector to match on each followed page.
+        selector: String,
+        /// Extra HTML attributes to capture, as in `query_all`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        attrs: Vec<String>,
+        /// Seconds to wait after each page load before evaluating (default: 3).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        wait: Option<u64>,
+    },
     /// Emit a Slack alert. Trigger behaviour is controlled by `on` (default: `"any"`).
     Alert {
         /// Slack message template. Supports `{url}`, `{text}`, `{class}`,
@@ -80,10 +120,17 @@ pub enum Step {
         /// Trigger mode (default: `"any"`).
         #[serde(default, skip_serializing_if = "AlertTrigger::is_default")]
         on: AlertTrigger,
-        /// Field to watch — required when `on = "change"`.
+        /// Field to watch — used by `change`/`decrease`/`increase` (the first
+        /// element's value) and as the identity key for `added`/`removed`.
         #[serde(skip_serializing_if = "Option::is_none")]
         field: Option<String>,
-        /// Assumed initial value for `on = "change"` when no prior state exists.
+        /// Var to watch instead of `field`, for `change`/`decrease`/`increase`.
+        /// Mutually exclusive with `field`; lets these triggers track an
+        /// aggregate built by `map` rather than the first element.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        var: Option<String>,
+        /// Assumed initial value for `change`/`decrease`/`increase` when no
+        /// prior state exists.
         #[serde(skip_serializing_if = "Option::is_none")]
         default: Option<String>,
         /// Stable identifier for the persisted state of an `on = "change"` alert.
@@ -95,6 +142,30 @@ pub enum Step {
     },
     /// Print the current element list to stdout.
     Log,
+}
+
+/// Default link field for the `follow` step.
+fn default_link_field() -> String {
+    "href".to_owned()
+}
+
+/// Sort direction for the `sort` step.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SortOrder {
+    /// Ascending (A→Z, low→high). The default.
+    #[default]
+    Asc,
+    /// Descending (Z→A, high→low).
+    Desc,
+}
+
+impl SortOrder {
+    /// Whether this is the default order (`Asc`); used to skip serialization.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        matches!(self, SortOrder::Asc)
+    }
 }
 
 /// Controls when an `alert` step fires.
@@ -109,10 +180,26 @@ pub enum AlertTrigger {
     Each,
     /// Fire when the element list is empty.
     Empty,
-    /// Fire when `field` of the first element changes from its previous value.
-    /// State is persisted between runs. Use `default` to set the assumed initial value.
-    /// No-op when the element list is empty.
+    /// Fire when `field` of the first element (or the watched `var`) changes from
+    /// its previous value. State is persisted between runs. Use `default` to set
+    /// the assumed initial value. No-op when watching a `field` and the element
+    /// list is empty.
     Change,
+    /// Fire once per element whose identity `field` was not present on the
+    /// previous run. State (the set of seen keys) is persisted between runs.
+    /// The new element's fields are available to the message.
+    Added,
+    /// Fire once per identity `field` that was present last run but is now gone.
+    /// Only the stored key value is available to the message (the element itself
+    /// is no longer in the list), exposed under the watched field's name.
+    Removed,
+    /// Fire when the watched numeric value (`field` of the first element, or
+    /// `var`) is strictly lower than its previous value. State is persisted; use
+    /// `default` for the assumed initial value. Parsed like the numeric ops.
+    Decrease,
+    /// Fire when the watched numeric value is strictly higher than its previous
+    /// value. The mirror of `decrease`.
+    Increase,
 }
 
 impl AlertTrigger {

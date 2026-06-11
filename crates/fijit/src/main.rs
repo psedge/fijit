@@ -62,7 +62,7 @@ fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a 
         .iter()
         .find(|s| s.name() == name)
         .map(|s| s.as_ref())
-        .ok_or_else(|| anyhow::anyhow!("unknown scraper '{}' — try `fijit list`", name))
+        .ok_or_else(|| anyhow::anyhow!("unknown scraper '{}' (try `fijit list`)", name))
 }
 
 fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
@@ -98,7 +98,7 @@ fn cmd_list(scrapers: &[Box<dyn Scraper>]) {
     println!("{:<20} {:<12} DESCRIPTION", "NAME", "SCHEDULE");
     println!("{}", "-".repeat(70));
     for s in scrapers {
-        let schedule = s.schedule().unwrap_or("—");
+        let schedule = s.schedule().unwrap_or("-");
         println!("{:<20} {:<12} {}", s.name(), schedule, s.description());
     }
 }
@@ -180,19 +180,23 @@ fn cmd_init_config() {
 }
 
 const INIT_CONFIG_TEMPLATE: &str = "\
-# fijit.toml — global config (gitignored, keep your secrets here)
+# fijit.toml: global config (gitignored, keep your secrets here)
 #
 # Scrapers live in scrapers/*.toml (also gitignored).
 # Run:      fijit run <name>          test a scraper
 #           fijit schedule <name>     add to crontab
 #           fijit list                show all scrapers
 #
-# Pipeline actions: query_all, eval_json, filter, find, set, map, alert, log
-# Element fields:   text, class, href, value — plus any in query_all's `attrs`
+# Pipeline actions: query_all, eval_json, filter, find, sort, compute, follow,
+#                   set, map, alert, log
+# Element fields:   text, class, href, value, plus any in query_all's `attrs`
 #                   list, e.g. attrs = [\"data-price\", \"aria-label\"]
 # Filter/find ops:  eq, not_eq, contains, not_contains, starts_with, ends_with,
 #                   matches (regex), gt, lt, gte, lte (numeric, e.g. price < 100)
-# Alert triggers:   on = \"any\" | \"each\" | \"empty\" | \"change\"
+#                   filter/find `value` may reference another field, e.g. {old}
+# Alert triggers:   on = \"any\" | \"each\" | \"empty\" | \"change\" | \"added\" |
+#                   \"removed\" | \"decrease\" | \"increase\"
+# Alert state persists in a [state] table at the bottom of each scraper file.
 
 obscura_path = \"/usr/local/bin/obscura\"
 slack_webhook = \"https://hooks.slack.com/services/...\"
@@ -215,7 +219,7 @@ fn main() -> Result<()> {
         }
         Cmd::List => cmd_list(&scrapers),
         Cmd::TestNotify => {
-            let msg = "🧪 *fijit test* — notifications are working!";
+            let msg = "🧪 *fijit test*: notifications are working!";
             notify::slack_if_configured(config.slack_webhook.as_deref(), msg);
             println!("Test notification sent.");
         }

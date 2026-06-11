@@ -32,4 +32,19 @@ impl Element {
             other => self.attrs.get(other).map(String::as_str),
         }
     }
+
+    /// Set a named field. Built-in names (`text`/`class`/`href`/`value`) write
+    /// the corresponding struct field; any other name is stored among `attrs`,
+    /// so it round-trips through [`get_field`](Self::get_field).
+    pub fn set_field(&mut self, field: &str, value: String) {
+        match field {
+            "text" => self.text = Some(value),
+            "class" => self.class = Some(value),
+            "href" => self.href = Some(value),
+            "value" => self.value = Some(value),
+            other => {
+                self.attrs.insert(other.to_owned(), value);
+            }
+        }
+    }
 }
