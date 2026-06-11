@@ -154,11 +154,7 @@ fn cmd_schedule(
     let tag = format!("# fijit:{name}");
 
     let existing = read_crontab()?;
-    let filtered: Vec<&str> = existing
-        .lines()
-        .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijit run {name}")))
-        .collect();
-
+    let filtered = strip_scraper_lines(&existing, name);
     let new_crontab = format!("{}\n{tag}\n{entry}\n", filtered.join("\n").trim_end());
     write_crontab(&new_crontab)?;
 
@@ -169,15 +165,26 @@ fn cmd_schedule(
 }
 
 fn cmd_unschedule(name: &str) -> Result<()> {
-    let tag = format!("# fijit:{name}");
     let existing = read_crontab()?;
-    let filtered: Vec<&str> = existing
-        .lines()
-        .filter(|l| !l.contains(&tag) && !l.contains(&format!("fijit run {name}")))
-        .collect();
+    let filtered = strip_scraper_lines(&existing, name);
     write_crontab(&format!("{}\n", filtered.join("\n").trim_end()))?;
     println!("Removed '{name}' from crontab");
     Ok(())
+}
+
+/// Remove fijit's crontab lines for `name`: the `# fijit:<name>` tag line and any
+/// entry line invoking `run <name>`. The tag is matched on the whole line and the
+/// entry on a space-delimited ` run <name> `, so it stays correct regardless of
+/// flags in the command (e.g. `--obscura`) and never clips a scraper whose name
+/// is a prefix of another (e.g. `rose` vs `rose-backroad-al`).
+fn strip_scraper_lines(existing: &str, name: &str) -> Vec<String> {
+    let tag = format!("# fijit:{name}");
+    let run = format!(" run {name} ");
+    existing
+        .lines()
+        .filter(|l| l.trim() != tag && !l.contains(&run))
+        .map(str::to_owned)
+        .collect()
 }
 
 fn read_crontab() -> Result<String> {
@@ -216,4 +223,40 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_scraper_lines;
+
+    #[test]
+    fn strip_removes_tag_and_flag_bearing_entry() {
+        let crontab = "SLACK_WEBHOOK=https://example\n\
+             # fijit:rose-backroad-al\n\
+             0 */6 * * *\tcd /home/peter && /usr/local/bin/fijit --obscura /usr/local/bin/obscura run rose-backroad-al >> /var/log/fijit/rose-backroad-al.log 2>&1\n";
+        let left = strip_scraper_lines(crontab, "rose-backroad-al").join("\n");
+        // The env line survives; the tag and the --obscura entry are gone (the bug).
+        assert!(left.contains("SLACK_WEBHOOK=https://example"));
+        assert!(!left.contains("rose-backroad-al"));
+    }
+
+    #[test]
+    fn strip_clears_orphaned_entry_without_tag() {
+        // An entry left behind by the old buggy dedup (no tag line) is still removed.
+        let crontab = "*/30 * * * *\tcd /x && /usr/local/bin/fijit --obscura /o run bikester >> /l/bikester.log 2>&1\n";
+        assert!(strip_scraper_lines(crontab, "bikester").is_empty());
+    }
+
+    #[test]
+    fn strip_keeps_other_scrapers_and_prefix_overlaps() {
+        let crontab = "# fijit:rose\n\
+             0 6 * * *\t/f --obscura /o run rose >> /l/rose.log 2>&1\n\
+             # fijit:rose-backroad-al\n\
+             0 6 * * *\t/f --obscura /o run rose-backroad-al >> /l/rose-backroad-al.log 2>&1\n";
+        // Removing `rose` must not touch `rose-backroad-al`.
+        let left = strip_scraper_lines(crontab, "rose").join("\n");
+        assert!(!left.contains("# fijit:rose\n") && !left.contains(" run rose "));
+        assert!(left.contains("# fijit:rose-backroad-al"));
+        assert!(left.contains(" run rose-backroad-al "));
+    }
 }
