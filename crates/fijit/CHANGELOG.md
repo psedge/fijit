@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/psedge/fijit/compare/v0.4.3...v0.4.4) (2026-06-11)
+
+
+### Bug Fixes
+
+* dedupe crontab entries robustly in schedule/unschedule ([0ebcda0](https://github.com/psedge/fijit/commit/0ebcda0511fdb36a46aa784ff870cf57670c7f9c))
+
 ## [0.4.3](https://github.com/psedge/fijit/compare/v0.4.2...v0.4.3) (2026-06-11)
 
 
