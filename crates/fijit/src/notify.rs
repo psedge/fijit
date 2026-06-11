@@ -29,6 +29,6 @@ pub fn slack_if_configured(webhook: Option<&str>, message: &str) {
                 eprintln!("Slack notification failed: {e}");
             }
         }
-        None => eprintln!("No Slack webhook configured — skipping notification"),
+        None => eprintln!("No Slack webhook configured, skipping notification"),
     }
 }

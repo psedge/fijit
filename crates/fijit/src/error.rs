@@ -15,9 +15,6 @@ pub enum Error {
     /// An HTTP request made by a scraper failed.
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
-    /// A configuration problem (missing file, parse error, invalid value).
-    #[error("config error: {0}")]
-    Config(String),
     /// A Slack (or other) notification could not be delivered.
     #[error("notification failed: {0}")]
     Notify(String),

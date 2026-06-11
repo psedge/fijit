@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::element::Element;
 use crate::obscura::ObscuraRunner;
 use crate::scraper::{ScrapeResult, Scraper};
@@ -8,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-/// Error handler for a scraper — sent to Slack when `check()` returns an error.
+/// Error handler for a scraper, sent to Slack when `check()` returns an error.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OnError {
     /// Slack message template. Supports `{name}` and `{error}` placeholders.
@@ -29,14 +28,16 @@ pub struct ScraperDef {
     /// Default cron schedule displayed in `fijit list`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schedule: Option<String>,
-    /// Per-scraper Slack webhook — overrides the global value from `fijit.toml`.
-    /// Supports `${ENV_VAR}` interpolation.
+    /// Slack webhook for this scraper. Supports `${ENV_VAR}` interpolation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slack_webhook: Option<String>,
+    /// Template variables available as `{name}` in this scraper's messages.
+    #[serde(default)]
+    pub vars: HashMap<String, String>,
     /// Ordered list of pipeline steps.
     #[serde(default)]
     pub steps: Vec<Step>,
-    /// Optional error handler — notifies Slack when the pipeline returns an error.
+    /// Optional error handler that notifies Slack when the pipeline returns an error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_error: Option<OnError>,
     /// Path this definition was loaded from. Set by [`load_scraper_files`]; used
@@ -46,23 +47,20 @@ pub struct ScraperDef {
     pub source_path: Option<std::path::PathBuf>,
 }
 
-/// A config-file-driven scraper that executes a declarative pipeline.
+/// A scraper loaded from a TOML file that executes a declarative pipeline.
 pub struct ConfigScraper {
     /// Parsed scraper definition.
     pub def: ScraperDef,
-    /// Global config (obscura path, global webhook, vars).
-    pub config: Config,
 }
 
 impl ConfigScraper {
-    /// Create a new `ConfigScraper` from a definition and the global config.
+    /// Create a new `ConfigScraper` from a definition.
     #[must_use]
-    pub fn new(def: ScraperDef, config: Config) -> Self {
-        Self { def, config }
+    pub fn new(def: ScraperDef) -> Self {
+        Self { def }
     }
 
-    /// Resolve the Slack webhook, preferring the per-scraper value over the global one.
-    /// Both support `${ENV_VAR}` interpolation.
+    /// Resolve the scraper's Slack webhook, with `${ENV_VAR}` interpolation.
     #[must_use]
     pub fn resolved_webhook(&self) -> Option<String> {
         self.def
@@ -70,13 +68,6 @@ impl ConfigScraper {
             .as_deref()
             .map(interpolate_env)
             .filter(|s| !s.is_empty())
-            .or_else(|| {
-                self.config
-                    .slack_webhook
-                    .as_deref()
-                    .map(interpolate_env)
-                    .filter(|s| !s.is_empty())
-            })
     }
 }
 
@@ -89,8 +80,8 @@ impl Scraper for ConfigScraper {
         self.def.description.as_deref().unwrap_or("")
     }
 
-    fn check(&self) -> Result<ScrapeResult> {
-        run_pipeline(&self.def, &self.config)
+    fn check(&self, obscura: &str) -> Result<ScrapeResult> {
+        run_pipeline(&self.def, obscura)
     }
 
     fn slack_webhook(&self) -> Option<String> {
@@ -110,7 +101,7 @@ impl Scraper for ConfigScraper {
 ///
 /// Parse errors are printed as warnings and skipped.
 #[must_use]
-pub fn load_scraper_files(config: &Config) -> Vec<ConfigScraper> {
+pub fn load_scraper_files() -> Vec<ConfigScraper> {
     let dir = Path::new("scrapers");
     if !dir.exists() {
         return vec![];
@@ -131,7 +122,7 @@ pub fn load_scraper_files(config: &Config) -> Vec<ConfigScraper> {
         match std::fs::read_to_string(&path).map(|s| toml::from_str::<ScraperDef>(&s)) {
             Ok(Ok(mut def)) => {
                 def.source_path = Some(path);
-                scrapers.push(ConfigScraper::new(def, config.clone()));
+                scrapers.push(ConfigScraper::new(def));
             }
             Ok(Err(e)) => eprintln!("warn: parse error in {}: {e}", path.display()),
             Err(e) => eprintln!("warn: could not read {}: {e}", path.display()),
@@ -396,12 +387,12 @@ struct PipelineState {
     state: std::collections::BTreeMap<String, String>,
 }
 
-fn run_pipeline(def: &ScraperDef, config: &Config) -> Result<ScrapeResult> {
+fn run_pipeline(def: &ScraperDef, obscura_path: &str) -> Result<ScrapeResult> {
     let url = def.url.as_deref().map(interpolate_env).unwrap_or_default();
-    let mut vars = config.vars.clone();
+    let mut vars = def.vars.clone();
     vars.insert("url".to_owned(), url.clone());
 
-    let obscura = ObscuraRunner::new(config.obscura());
+    let obscura = ObscuraRunner::new(obscura_path);
     let ctx = PipelineCtx {
         obscura: &obscura,
         url: &url,

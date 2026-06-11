@@ -14,16 +14,16 @@ pub trait Scraper: Send + Sync {
     /// Human-readable description shown in `fijit list`.
     fn description(&self) -> &str;
 
-    /// Run one check and return what changed (if anything).
+    /// Run one check and return what changed (if anything), using the resolved
+    /// path to the Obscura binary for page fetches.
     ///
     /// Uses `anyhow::Result` so scrapers can use `?` with any error type.
     ///
     /// # Errors
     /// Returns an error if the scraper encounters a fatal problem (network, parse, etc.).
-    fn check(&self) -> anyhow::Result<ScrapeResult>;
+    fn check(&self, obscura: &str) -> anyhow::Result<ScrapeResult>;
 
-    /// Per-scraper Slack webhook, overriding the global config value.
-    /// Return `None` to fall back to the global webhook.
+    /// The scraper's Slack webhook. Return `None` to send no notification.
     fn slack_webhook(&self) -> Option<String> {
         None
     }

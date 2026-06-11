@@ -1,6 +1,5 @@
 #![deny(unsafe_code)]
 
-mod config;
 mod element;
 mod error;
 mod notify;
@@ -11,13 +10,15 @@ mod step;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use config::Config;
 use pipeline::{interpolate_template, load_scraper_files};
 use scraper::{ScrapeResult, Scraper};
 
 #[derive(Parser)]
 #[command(name = "fijit", about = "Lightweight web scraper framework")]
 struct Cli {
+    /// Path to the Obscura binary. Defaults to `obscura` found on $PATH.
+    #[arg(long, global = true)]
+    obscura: Option<String>,
     #[command(subcommand)]
     command: Cmd,
 }
@@ -31,8 +32,6 @@ enum Cmd {
     },
     /// List all available scrapers and their schedule
     List,
-    /// Send a test Slack notification
-    TestNotify,
     /// Schedule a scraper via crontab
     Schedule {
         /// Scraper name
@@ -46,15 +45,32 @@ enum Cmd {
         /// Scraper name
         name: String,
     },
-    /// Print an example fijit.toml to stdout
-    InitConfig,
 }
 
-fn load_scrapers(config: &Config) -> Vec<Box<dyn Scraper>> {
-    load_scraper_files(config)
+fn load_scrapers() -> Vec<Box<dyn Scraper>> {
+    load_scraper_files()
         .into_iter()
         .map(|s| Box::new(s) as Box<dyn Scraper>)
         .collect()
+}
+
+/// Resolve the Obscura binary path from the `--obscura` flag, otherwise the
+/// first `obscura` on `$PATH`. Errors if neither is available.
+fn resolve_obscura(flag: Option<&str>) -> Result<String> {
+    if let Some(p) = flag {
+        return Ok(p.to_owned());
+    }
+    find_on_path("obscura")
+        .ok_or_else(|| anyhow::anyhow!("obscura not found on $PATH; pass --obscura <path>"))
+}
+
+/// Return the full path to `bin` if it exists in any `$PATH` directory.
+fn find_on_path(bin: &str) -> Option<String> {
+    let paths = std::env::var_os("PATH")?;
+    std::env::split_paths(&paths).find_map(|dir| {
+        let full = dir.join(bin);
+        full.is_file().then(|| full.to_string_lossy().into_owned())
+    })
 }
 
 fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a dyn Scraper> {
@@ -65,13 +81,11 @@ fn find_scraper<'a>(scrapers: &'a [Box<dyn Scraper>], name: &str) -> Result<&'a 
         .ok_or_else(|| anyhow::anyhow!("unknown scraper '{}' (try `fijit list`)", name))
 }
 
-fn run_scraper(scraper: &dyn Scraper, config: &Config) -> Result<()> {
-    let webhook = scraper
-        .slack_webhook()
-        .or_else(|| config.slack_webhook.clone());
+fn run_scraper(scraper: &dyn Scraper, obscura: &str) -> Result<()> {
+    let webhook = scraper.slack_webhook();
 
     println!("[{}] checking…", scraper.name());
-    match scraper.check() {
+    match scraper.check(obscura) {
         Ok(ScrapeResult::NoChange) => println!("[{}] no change", scraper.name()),
         Ok(ScrapeResult::Alerts(msgs)) => {
             for msg in &msgs {
@@ -103,7 +117,12 @@ fn cmd_list(scrapers: &[Box<dyn Scraper>]) {
     }
 }
 
-fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result<()> {
+fn cmd_schedule(
+    name: &str,
+    cron: &str,
+    obscura: &str,
+    scrapers: &[Box<dyn Scraper>],
+) -> Result<()> {
     find_scraper(scrapers, name)?;
 
     let binary = std::env::current_exe()?.to_string_lossy().into_owned();
@@ -127,7 +146,11 @@ fn cmd_schedule(name: &str, cron: &str, scrapers: &[Box<dyn Scraper>]) -> Result
     let _ = std::fs::remove_file(&probe);
     let log_path = format!("{log_dir}/{name}.log");
 
-    let entry = format!("{cron}\tcd {cron_dir} && {binary} run {name} >> {log_path} 2>&1");
+    // Embed the resolved Obscura path so the cron job (with its minimal PATH)
+    // does not depend on `obscura` being discoverable at run time.
+    let entry = format!(
+        "{cron}\tcd {cron_dir} && {binary} --obscura {obscura} run {name} >> {log_path} 2>&1"
+    );
     let tag = format!("# fijit:{name}");
 
     let existing = read_crontab()?;
@@ -174,58 +197,22 @@ fn write_crontab(contents: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_init_config() {
-    use std::io::Write;
-    let _ = std::io::stdout().write_all(INIT_CONFIG_TEMPLATE.as_bytes());
-}
-
-const INIT_CONFIG_TEMPLATE: &str = "\
-# fijit.toml: global config (gitignored, keep your secrets here)
-#
-# Scrapers live in scrapers/*.toml (also gitignored).
-# Run:      fijit run <name>          test a scraper
-#           fijit schedule <name>     add to crontab
-#           fijit list                show all scrapers
-#
-# Pipeline actions: query_all, eval_json, filter, find, sort, compute, follow,
-#                   set, map, alert, log
-# Element fields:   text, class, href, value, plus any in query_all's `attrs`
-#                   list, e.g. attrs = [\"data-price\", \"aria-label\"]
-# Filter/find ops:  eq, not_eq, contains, not_contains, starts_with, ends_with,
-#                   matches (regex), gt, lt, gte, lte (numeric, e.g. price < 100)
-#                   filter/find `value` may reference another field, e.g. {old}
-# Alert triggers:   on = \"any\" | \"each\" | \"empty\" | \"change\" | \"added\" |
-#                   \"removed\" | \"decrease\" | \"increase\"
-# Alert state persists in a [state] table at the bottom of each scraper file.
-
-obscura_path = \"/usr/local/bin/obscura\"
-slack_webhook = \"https://hooks.slack.com/services/...\"
-# or: slack_webhook = \"${SLACK_WEBHOOK}\"   to read from the environment
-
-# [vars]
-# Global template variables available as {MY_VAR} in alert messages.
-# MY_KEY = \"my-value\"
-";
-
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let config = Config::load_or_default();
-    let scrapers = load_scrapers(&config);
+    let scrapers = load_scrapers();
 
     match &cli.command {
         Cmd::Run { name } => {
+            let obscura = resolve_obscura(cli.obscura.as_deref())?;
             let scraper = find_scraper(&scrapers, name)?;
-            run_scraper(scraper, &config)?;
+            run_scraper(scraper, &obscura)?;
         }
         Cmd::List => cmd_list(&scrapers),
-        Cmd::TestNotify => {
-            let msg = "🧪 *fijit test*: notifications are working!";
-            notify::slack_if_configured(config.slack_webhook.as_deref(), msg);
-            println!("Test notification sent.");
+        Cmd::Schedule { name, cron } => {
+            let obscura = resolve_obscura(cli.obscura.as_deref())?;
+            cmd_schedule(name, cron, &obscura, &scrapers)?;
         }
-        Cmd::Schedule { name, cron } => cmd_schedule(name, cron, &scrapers)?,
         Cmd::Unschedule { name } => cmd_unschedule(name)?,
-        Cmd::InitConfig => cmd_init_config(),
     }
 
     Ok(())

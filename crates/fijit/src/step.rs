@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 /// A single declarative step in a scraper pipeline.
 ///
 /// Steps are internally tagged by `action` in TOML, and each variant carries
-/// exactly the fields that action needs — so a config that omits a required
+/// exactly the fields that action needs, so a config that omits a required
 /// field (or supplies one that doesn't apply) fails at parse time rather than
 /// during execution.
 ///
@@ -87,7 +87,7 @@ pub enum Step {
     },
     /// Derive a new per-element `field` from a `template`, evaluated against each
     /// element's fields and the current vars. Adds (or overwrites) that field on
-    /// every element — useful for building readable labels or stable fingerprints.
+    /// every element. Useful for building readable labels or stable fingerprints.
     Compute {
         /// Name of the field to write on each element.
         field: String,
@@ -97,7 +97,7 @@ pub enum Step {
     },
     /// For each element, fetch the URL in `field` and extract elements matching
     /// `selector` on that page. The element list is replaced by the flattened
-    /// matches across every followed page — one bounded level of link-walking.
+    /// matches across every followed page, one bounded level of link-walking.
     Follow {
         /// Element field holding the link to follow (default: `"href"`).
         /// Relative links are resolved against the scraper URL.
@@ -120,7 +120,7 @@ pub enum Step {
         /// Trigger mode (default: `"any"`).
         #[serde(default, skip_serializing_if = "AlertTrigger::is_default")]
         on: AlertTrigger,
-        /// Field to watch — used by `change`/`decrease`/`increase` (the first
+        /// Field to watch, used by `change`/`decrease`/`increase` (the first
         /// element's value) and as the identity key for `added`/`removed`.
         #[serde(skip_serializing_if = "Option::is_none")]
         field: Option<String>,
@@ -136,7 +136,7 @@ pub enum Step {
         /// Stable identifier for the persisted state of an `on = "change"` alert.
         /// State is stored under this id, so it survives inserting or reordering
         /// other steps. When omitted, state falls back to the step's position,
-        /// which shifts if the pipeline changes — set an `id` to avoid spurious alerts.
+        /// which shifts if the pipeline changes, so set an `id` to avoid spurious alerts.
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<String>,
     },
