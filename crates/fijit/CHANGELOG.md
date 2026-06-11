@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.3](https://github.com/psedge/fijit/compare/v0.4.2...v0.4.3) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* drop global config; obscura via --obscura or $PATH, scrapers self-contained
+
+### Features
+
+* add sort/compute/follow steps, new alert triggers and in-file state ([0884e3a](https://github.com/psedge/fijit/commit/0884e3a5474fd781c2deef01aa3c1b16b65ab8cb))
+* drop global config; obscura via --obscura or $PATH, scrapers self-contained ([0865649](https://github.com/psedge/fijit/commit/0865649df173c2ab435e45ccb1d6db6553d3f8b8))
+
 ## [0.4.2](https://github.com/psedge/fijit/compare/v0.4.1...v0.4.2) (2026-06-10)
 
 
