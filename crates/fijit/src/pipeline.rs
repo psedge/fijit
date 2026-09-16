@@ -309,7 +309,16 @@ fn eval_op(field_val: &str, op: &Op, value: &str) -> bool {
         Op::NotEq => field_val != value,
         Op::Contains => field_val.contains(value),
         Op::NotContains => !field_val.contains(value),
-        Op::Matches => regex::Regex::new(value).is_ok_and(|re| re.is_match(field_val)),
+        Op::Matches => match regex::RegexBuilder::new(value)
+            .size_limit(64 * 1024 * 1024)
+            .build()
+        {
+            Ok(re) => re.is_match(field_val),
+            Err(e) => {
+                eprintln!("warn: matches: invalid regex, treating as no-match: {e}");
+                false
+            }
+        },
         Op::StartsWith => field_val.starts_with(value),
         Op::EndsWith => field_val.ends_with(value),
         Op::Gt => num_cmp(field_val, value, |a, b| a > b),
