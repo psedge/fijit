@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/psedge/fijit/compare/v0.4.4...v0.4.5) (2026-09-16)
+
+
+### Bug Fixes
+
+* raise matches regex size limit and surface compile errors ([#22](https://github.com/psedge/fijit/issues/22)) ([0d36ea9](https://github.com/psedge/fijit/commit/0d36ea9ff35b305a2ab93f48742dc496425e6b78))
+
 ## [0.4.4](https://github.com/psedge/fijit/compare/v0.4.3...v0.4.4) (2026-06-11)
 
 
