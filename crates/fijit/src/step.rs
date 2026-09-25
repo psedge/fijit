@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// A single declarative step in a scraper pipeline.
 ///
@@ -140,8 +141,52 @@ pub enum Step {
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<String>,
     },
+    /// Fetch a URL with a plain HTTP request (no browser/JS, bypasses Obscura
+    /// entirely) and query the response body with a CSS `selector`. For sites
+    /// with no bot protection that expose data via a plain GET/POST endpoint
+    /// (e.g. a pagination/AJAX API), this can fetch far more than a single
+    /// rendered page would show. Replaces the current element list.
+    HttpQuery {
+        /// HTTP method (default: `"get"`).
+        #[serde(default)]
+        method: HttpMethod,
+        /// URL to fetch. Defaults to the scraper's top-level `url` when omitted.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        /// Request body, e.g. `application/x-www-form-urlencoded` data for a
+        /// POST. Supports `${ENV_VAR}` interpolation.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<String>,
+        /// Extra request headers.
+        #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+        headers: HashMap<String, String>,
+        /// CSS selector for the repeating element (e.g. one result row/card).
+        selector: String,
+        /// Optional CSS selector for a descendant link, relative to each
+        /// matched element. When given, `text` and `href` come from that link
+        /// (resolved against the request URL if relative) instead of the
+        /// matched element itself.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        link_selector: Option<String>,
+        /// Named descendant CSS selectors, each resolved relative to the
+        /// matched element and captured as trimmed text, e.g.
+        /// `{ venue = ".venue", date = ".date" }`. Each becomes addressable by
+        /// `field` and as a `{name}` template var, like `query_all`'s `attrs`.
+        #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+        attrs: HashMap<String, String>,
+    },
     /// Print the current element list to stdout.
     Log,
+}
+
+/// HTTP method for an `http_query` step.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HttpMethod {
+    /// The default.
+    #[default]
+    Get,
+    Post,
 }
 
 /// Default link field for the `follow` step.

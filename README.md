@@ -147,6 +147,7 @@ message = "{data-sku} dropped to {data-price}: {url}"
 | `sort` | Reorder the elements by `field`. | `field` |
 | `compute` | Add a derived `field` to every element from a `template`. | `field`, `template` |
 | `follow` | For each element, fetch the URL in `field` and extract `selector` on that page. Flattens the matches into state. | `selector` |
+| `http_query` | Fetch `url` with a plain HTTP request (no browser/JS, bypasses Obscura) and query the response with `selector`. Replaces state. | `selector` |
 | `set` | Store a literal `value` into a named `var`. | `var`, `value` |
 | `map` | Collect `field` from all elements into a named `var` (comma-joined). | `field`, `var` |
 | `alert` | Emit a Slack alert. Trigger behaviour controlled by `on` (default: `any`). | `message` |
@@ -191,6 +192,26 @@ action   = "follow"
 field    = "href"                  # link to walk (default)
 selector = ".size-selector option" # extracted on each detail page
 attrs    = ["data-stock"]
+```
+
+### `http_query`
+
+Fetches `url` (defaults to the scraper's top-level `url`) with a plain HTTP request instead of Obscura — no browser, no JS execution, no stealth fingerprinting. Useful for an API or AJAX endpoint that has no bot protection: it's faster than a browser fetch, and unlike `query_all`/`eval_json`/`follow`, it can send a POST with a body, e.g. to drive a "load more" endpoint directly and pull a full result set in one call instead of whatever a single rendered page shows.
+
+`method` is `get` (default) or `post`. `body` and `headers` are optional; `body` supports `${ENV_VAR}` interpolation. `selector` matches repeating elements in the response, same as `query_all`. Optional `link_selector` names a descendant link (e.g. a card's title anchor) to source `text`/`href` from instead of the matched element itself — handy since the outer selector is rarely itself the link. Optional `attrs` is a map of `field name -> descendant CSS selector`, each captured as trimmed text relative to the matched element (unlike `query_all`'s `attrs`, which only reads HTML attributes of the matched element itself) — this is how to pull sibling fields like a listing's venue or date out of one flat request.
+
+```toml
+[[steps]]
+action        = "http_query"
+method        = "post"
+url           = "https://example.com/wp-content/themes/x/ajax/"   # overrides the scraper url
+body          = "action=site_query&paged=1&args=%7B...%7D"
+selector      = ".post-item"
+link_selector = ".post-item__title a"   # text/href come from here
+
+[steps.attrs]
+venue = ".post-item__venue"
+date  = ".post-item__date"
 ```
 
 ### Alert triggers (`on`)

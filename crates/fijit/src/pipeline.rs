@@ -1,7 +1,7 @@
 use crate::element::Element;
 use crate::obscura::ObscuraRunner;
 use crate::scraper::{ScrapeResult, Scraper};
-use crate::step::{AlertTrigger, Op, SortOrder, Step};
+use crate::step::{AlertTrigger, HttpMethod, Op, SortOrder, Step};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -285,6 +285,94 @@ fn build_query_script(selector: &str, attrs: &[String]) -> String {
     )
 }
 
+/// Fetch `url` with a plain HTTP request (no browser/JS) and turn every match
+/// of `selector` in the response body into an [`Element`]. When `link_selector`
+/// is given, `text`/`href` come from that descendant instead of the matched
+/// element itself; `attrs` are named descendant selectors captured as trimmed
+/// text, resolved relative to the matched element.
+#[allow(clippy::too_many_arguments)]
+fn http_query(
+    url: &str,
+    method: HttpMethod,
+    body: Option<&str>,
+    headers: &HashMap<String, String>,
+    selector: &str,
+    link_selector: Option<&str>,
+    attrs: &HashMap<String, String>,
+) -> Result<Vec<Element>> {
+    let client = reqwest::blocking::Client::new();
+    let mut req = match method {
+        HttpMethod::Get => client.get(url),
+        HttpMethod::Post => client.post(url),
+    };
+    for (k, v) in headers {
+        req = req.header(k, v);
+    }
+    if let Some(b) = body {
+        req = req.body(b.to_owned());
+    }
+    let text = req
+        .send()
+        .context("http_query: request failed")?
+        .text()
+        .context("http_query: failed to read response body")?;
+
+    extract_from_html(&text, url, selector, link_selector, attrs)
+}
+
+/// Parse `html` and turn every match of `selector` into an [`Element`], per the
+/// same rules as [`http_query`]. Split out from the request logic so it can be
+/// tested against a fixture without a network call.
+fn extract_from_html(
+    html: &str,
+    base_url: &str,
+    selector: &str,
+    link_selector: Option<&str>,
+    attrs: &HashMap<String, String>,
+) -> Result<Vec<Element>> {
+    let doc = scraper::Html::parse_document(html);
+    let row_sel = scraper::Selector::parse(selector)
+        .map_err(|e| anyhow::anyhow!("http_query: invalid selector {selector:?}: {e}"))?;
+    let link_sel = link_selector
+        .map(scraper::Selector::parse)
+        .transpose()
+        .map_err(|e| anyhow::anyhow!("http_query: invalid link_selector: {e}"))?;
+    let attr_sels: HashMap<&String, scraper::Selector> = attrs
+        .iter()
+        .filter_map(|(name, sel)| scraper::Selector::parse(sel).ok().map(|s| (name, s)))
+        .collect();
+
+    let mut out = Vec::new();
+    for row in doc.select(&row_sel) {
+        let link_el = link_sel.as_ref().and_then(|s| row.select(s).next());
+        let text_source = link_el.unwrap_or(row);
+        let text = text_source.text().collect::<String>().trim().to_owned();
+        let href = link_el
+            .and_then(|el| el.value().attr("href"))
+            .or_else(|| row.value().attr("href"))
+            .map(|h| resolve_url(base_url, h));
+        let class = row.value().attr("class").map(str::to_owned);
+        let value = row.value().attr("value").map(str::to_owned);
+        let mut el_attrs = HashMap::new();
+        for (name, sel) in &attr_sels {
+            if let Some(found) = row.select(sel).next() {
+                let v = found.text().collect::<String>().trim().to_owned();
+                if !v.is_empty() {
+                    el_attrs.insert((*name).clone(), v);
+                }
+            }
+        }
+        out.push(Element {
+            text: (!text.is_empty()).then_some(text),
+            class,
+            href,
+            value,
+            attrs: el_attrs,
+        });
+    }
+    Ok(out)
+}
+
 /// Resolve a possibly-relative `href` against the page `base` URL. Absolute URLs
 /// pass through unchanged; everything else is hung off the base's origin.
 fn resolve_url(base: &str, href: &str) -> String {
@@ -453,6 +541,29 @@ fn execute_step(
             let vals: Vec<serde_json::Value> =
                 serde_json::from_str(&json).context("eval_json: expected JSON array")?;
             ps.elements = vals.iter().map(json_to_element).collect();
+        }
+        Step::HttpQuery {
+            method,
+            url,
+            body,
+            headers,
+            selector,
+            link_selector,
+            attrs,
+        } => {
+            let target = url
+                .as_deref()
+                .map_or_else(|| ctx.url.to_owned(), interpolate_env);
+            let body = body.as_deref().map(interpolate_env);
+            ps.elements = http_query(
+                &target,
+                *method,
+                body.as_deref(),
+                headers,
+                selector,
+                link_selector.as_deref(),
+                attrs,
+            )?;
         }
         Step::Find { field, op, value } => {
             let found = ps
@@ -804,6 +915,81 @@ message = "hi {data-price}"
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn http_query_step_parses_with_defaults_and_overrides() {
+        let src = r#"
+name = "t"
+[[steps]]
+action = "http_query"
+selector = ".row"
+
+[[steps]]
+action = "http_query"
+method = "post"
+url = "https://example.com/xhr/"
+body = "a=1"
+selector = ".row"
+link_selector = ".row a"
+[steps.headers]
+Content-Type = "application/x-www-form-urlencoded"
+[steps.attrs]
+venue = ".venue"
+"#;
+        let def: ScraperDef = toml::from_str(src).unwrap();
+        assert_eq!(def.steps.len(), 2);
+        assert!(matches!(
+            &def.steps[0],
+            Step::HttpQuery { method: HttpMethod::Get, url: None, body: None, selector, .. }
+            if selector == ".row"
+        ));
+        assert!(matches!(
+            &def.steps[1],
+            Step::HttpQuery {
+                method: HttpMethod::Post,
+                url: Some(u),
+                body: Some(b),
+                selector,
+                link_selector: Some(l),
+                ..
+            } if u == "https://example.com/xhr/" && b == "a=1" && selector == ".row" && l == ".row a"
+        ));
+    }
+
+    #[test]
+    fn extract_from_html_pulls_link_text_href_and_named_descendants() {
+        let html = r#"
+            <ul>
+              <li class="row">
+                <a href="/one"><span class="title">First</span></a>
+                <div class="venue">Venue A</div>
+              </li>
+              <li class="row">
+                <a href="https://other.example/two"><span class="title">Second</span></a>
+                <div class="venue">Venue B</div>
+              </li>
+            </ul>
+        "#;
+        let mut attrs = HashMap::new();
+        attrs.insert("venue".to_owned(), ".venue".to_owned());
+
+        let els = extract_from_html(
+            html,
+            "https://example.com/list/",
+            ".row",
+            Some(".row a"),
+            &attrs,
+        )
+        .unwrap();
+
+        assert_eq!(els.len(), 2);
+        assert_eq!(els[0].text.as_deref(), Some("First"));
+        assert_eq!(els[0].href.as_deref(), Some("https://example.com/one"));
+        assert_eq!(els[0].get_field("venue"), Some("Venue A"));
+        assert_eq!(els[1].text.as_deref(), Some("Second"));
+        assert_eq!(els[1].href.as_deref(), Some("https://other.example/two"));
+        assert_eq!(els[1].get_field("venue"), Some("Venue B"));
     }
 
     #[test]

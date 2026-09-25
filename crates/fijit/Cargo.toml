@@ -23,5 +23,6 @@ clap = { workspace = true }
 chrono = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+scraper = { workspace = true }
 thiserror = "2"
 tempfile = "3"
