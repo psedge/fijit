@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/psedge/fijit/compare/v0.4.5...v0.4.6) (2026-09-25)
+
+
+### Features
+
+* add http_query step for plain-HTTP fetches bypassing Obscura ([#25](https://github.com/psedge/fijit/issues/25)) ([2d323fb](https://github.com/psedge/fijit/commit/2d323fb43f634f37312db91a4a6ed525336c9be8))
+
 ## [0.4.5](https://github.com/psedge/fijit/compare/v0.4.4...v0.4.5) (2026-09-16)
 
 
