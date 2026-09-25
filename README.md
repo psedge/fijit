@@ -241,6 +241,12 @@ Numeric ops ignore currency symbols and thousands separators, so a scraped
 price like `£1,299.00` compares as `1299.0`. They don't match if either side
 isn't a number (e.g. `"sold out"`).
 
+`matches` compiles with a raised size limit (64MB, well above the `regex`
+crate's 10MB default) so large alternations — e.g. matching a field against
+thousands of literal names — compile instead of silently failing. An invalid
+or still-too-large pattern logs a `warn: matches: invalid regex...` line and
+is treated as no-match, rather than erroring the whole run.
+
 In `filter` and `find`, the `value` supports `{field}` interpolation against the
 element being tested, so you can compare one field to another, not just to a
 literal. For example, keep only genuinely discounted items:
