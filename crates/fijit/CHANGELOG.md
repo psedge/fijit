@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.7](https://github.com/psedge/fijit/compare/v0.4.6...v0.4.7) (2026-10-09)
+
+
+### Bug Fixes
+
+* space-join http_query's text extraction across sibling nodes ([#27](https://github.com/psedge/fijit/issues/27)) ([9df5921](https://github.com/psedge/fijit/commit/9df59210f6669def6dd346912ddbe28264a7a378))
+
 ## [0.4.6](https://github.com/psedge/fijit/compare/v0.4.5...v0.4.6) (2026-09-25)
 
 
