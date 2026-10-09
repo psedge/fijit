@@ -346,7 +346,7 @@ fn extract_from_html(
     for row in doc.select(&row_sel) {
         let link_el = link_sel.as_ref().and_then(|s| row.select(s).next());
         let text_source = link_el.unwrap_or(row);
-        let text = text_source.text().collect::<String>().trim().to_owned();
+        let text = collapsed_text(text_source);
         let href = link_el
             .and_then(|el| el.value().attr("href"))
             .or_else(|| row.value().attr("href"))
@@ -356,7 +356,7 @@ fn extract_from_html(
         let mut el_attrs = HashMap::new();
         for (name, sel) in &attr_sels {
             if let Some(found) = row.select(sel).next() {
-                let v = found.text().collect::<String>().trim().to_owned();
+                let v = collapsed_text(found);
                 if !v.is_empty() {
                     el_attrs.insert((*name).clone(), v);
                 }
@@ -371,6 +371,20 @@ fn extract_from_html(
         });
     }
     Ok(out)
+}
+
+/// Join an element's text nodes with a single space and collapse whitespace
+/// runs, matching `query_all`'s `textContent.replace(/\s+/g,' ').trim()`.
+/// Plain concatenation (`text().collect::<String>()`) runs separate text
+/// nodes together with no separator, e.g. adjacent `<div>9</div><div>Okt</div>`
+/// becomes `"9Okt"` instead of `"9 Okt"`.
+fn collapsed_text(el: scraper::ElementRef<'_>) -> String {
+    el.text()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Resolve a possibly-relative `href` against the page `base` URL. Absolute URLs
